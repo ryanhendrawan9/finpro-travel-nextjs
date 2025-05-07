@@ -1,3 +1,4 @@
+// src/app/transaction/page.jsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -50,18 +51,43 @@ export default function TransactionsPage() {
 
   // Format date
   const formatDate = (dateString) => {
-    const options = {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    };
-    return new Date(dateString).toLocaleDateString("en-US", options);
+    if (!dateString) return "N/A";
+
+    try {
+      const options = {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      };
+      return new Date(dateString).toLocaleDateString("en-US", options);
+    } catch (e) {
+      console.error("Date formatting error:", e);
+      return "Invalid date";
+    }
+  };
+
+  // Safely format number
+  const formatCurrency = (value) => {
+    if (value === undefined || value === null) return "Rp 0";
+    try {
+      return `Rp ${value.toLocaleString("id-ID")}`;
+    } catch (e) {
+      console.error("Currency formatting error:", e, "Value:", value);
+      return "Rp 0";
+    }
   };
 
   // Get status details
   const getStatusDetails = (status) => {
+    if (!status)
+      return {
+        color: "text-gray-600 bg-gray-100",
+        icon: <FiInfo className="mr-2" />,
+        text: "Unknown",
+      };
+
     switch (status) {
       case "waiting-for-payment":
         return {
@@ -133,7 +159,7 @@ export default function TransactionsPage() {
           My Transactions
         </h1>
 
-        {transactions.length > 0 ? (
+        {transactions && transactions.length > 0 ? (
           <motion.div
             className="space-y-6"
             initial={{ opacity: 0 }}
@@ -141,11 +167,14 @@ export default function TransactionsPage() {
             transition={{ duration: 0.5 }}
           >
             {transactions.map((transaction) => {
-              const statusDetails = getStatusDetails(transaction.status);
+              const statusDetails = getStatusDetails(transaction?.status);
+              const id = transaction?.id || "unknown";
+              const shortId = id.substring(0, 8);
+              const amount = transaction?.amount || 0;
 
               return (
                 <motion.div
-                  key={transaction.id}
+                  key={id}
                   className="overflow-hidden bg-white shadow-sm rounded-xl"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -157,7 +186,7 @@ export default function TransactionsPage() {
                       <div>
                         <div className="flex items-center">
                           <h3 className="mr-3 text-lg font-bold text-gray-900">
-                            Transaction #{transaction.id.substring(0, 8)}
+                            Transaction #{shortId}
                           </h3>
                           <span
                             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDetails.color}`}
@@ -166,12 +195,12 @@ export default function TransactionsPage() {
                           </span>
                         </div>
                         <p className="mt-1 text-sm text-gray-500">
-                          {formatDate(transaction.createdAt)}
+                          {formatDate(transaction?.createdAt)}
                         </p>
                       </div>
                       <div className="mt-3 md:mt-0">
                         <span className="text-lg font-bold text-primary-600">
-                          Rp {transaction.amount.toLocaleString("id-ID")}
+                          {formatCurrency(amount)}
                         </span>
                       </div>
                     </div>
@@ -184,7 +213,7 @@ export default function TransactionsPage() {
                           Payment Method
                         </h4>
                         <div className="flex items-center">
-                          {transaction.paymentMethod?.imageUrl && (
+                          {transaction?.paymentMethod?.imageUrl && (
                             <img
                               src={transaction.paymentMethod.imageUrl}
                               alt={transaction.paymentMethod.name}
@@ -192,7 +221,7 @@ export default function TransactionsPage() {
                             />
                           )}
                           <span className="font-medium text-gray-900">
-                            {transaction.paymentMethod?.name || "N/A"}
+                            {transaction?.paymentMethod?.name || "N/A"}
                           </span>
                         </div>
                       </div>
@@ -202,14 +231,14 @@ export default function TransactionsPage() {
                           Items
                         </h4>
                         <div className="text-gray-900">
-                          {transaction.cart?.length || 0} item(s)
+                          {transaction?.cart?.length || 0} item(s)
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-end mt-6">
                       <Link
-                        href={`/transaction/${transaction.id}`}
+                        href={`/transaction/${id}`}
                         className="inline-flex items-center font-medium text-primary-600 hover:text-primary-700"
                       >
                         View Details <FiArrowRight className="ml-2" />

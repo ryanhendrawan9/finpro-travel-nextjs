@@ -1,3 +1,4 @@
+// src/app/(auth)/register/page.jsx
 "use client";
 
 import { useState } from "react";
@@ -15,7 +16,7 @@ export default function RegisterPage() {
     passwordRepeat: "",
     phoneNumber: "",
     profilePictureUrl:
-      "https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxzZWFyY2h8MXx8dXNlcnxlbnwwfHwwfHw%3D&w=1000&q=80", // Default profile picture
+      "https://images.unsplash.com/photo-1633332755192-727a05c4013d?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxzZWFyY2h8MXx8dXNlcnxlbnwwfHwwfHw%3D&w=1000&q=80",
     role: "user",
   });
   const [error, setError] = useState("");
@@ -71,55 +72,139 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 mt-12 bg-gray-50 sm:px-6 lg:px-8">
-      <motion.div
-        className="w-full max-w-md p-10 space-y-8 bg-white shadow-xl rounded-2xl"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div>
-          <h2 className="mt-6 text-3xl font-extrabold text-center text-gray-900 font-heading">
-            Create an Account
-          </h2>
-          <p className="mt-2 text-sm text-center text-gray-600">
-            Sign up to start exploring amazing destinations and experiences
-          </p>
+    <div className="flex min-h-screen">
+      {/* Left side image - visible on medium screens and up */}
+      <div className="hidden md:block md:w-1/2">
+        <div className="relative h-full opacity-100">
+          <img
+            src="/images/travel-bg.jpg"
+            alt="Travel"
+            className="object-cover w-full h-full"
+          />
+          <div className="absolute inset-0 flex flex-col justify-center p-12">
+            <div className="text-white">
+              <h1 className="mb-6 text-4xl font-bold font-heading">
+                Let's Travel The Beautiful World Together
+              </h1>
+              <p className="text-lg text-white/90">
+                We always make our customer happy by providing as many choices
+                as possible
+              </p>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {error && (
-          <motion.div
-            className="p-4 text-sm text-red-800 rounded-lg bg-red-50"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            transition={{ duration: 0.3 }}
-          >
-            {error}
-          </motion.div>
-        )}
+      {/* Registration form */}
+      <div className="flex items-center justify-center w-full p-6 md:w-1/2">
+        <motion.div
+          className="w-full max-w-md p-8 space-y-6 bg-white shadow-lg rounded-2xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div>
+            <Link
+              href="/"
+              className="flex items-center mb-6 text-gray-600 hover:text-gray-800"
+            >
+              <FiArrowRight className="mr-2 rotate-180" /> Back
+            </Link>
+            <h2 className="text-3xl font-bold text-gray-900 font-heading">
+              Register an account
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Start your journey with one click, explore the beautiful world!
+            </p>
+          </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4 rounded-md shadow-sm">
+          {error && (
+            <motion.div
+              className="p-4 text-sm text-red-800 rounded-lg bg-red-50"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              transition={{ duration: 0.3 }}
+            >
+              {error}
+            </motion.div>
+          )}
+
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            {/* Role selection */}
             <div>
-              <label
-                htmlFor="name"
-                className="block mb-1 text-sm font-medium text-gray-700"
-              >
-                Full Name
+              <label className="block mb-2 text-sm font-medium text-gray-700">
+                Looking for?
               </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <FiUser className="w-5 h-5 text-gray-400" />
-                </div>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={handleChange}
-                  className="block w-full py-3 pl-10 pr-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  placeholder="John Doe"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <label
+                  className={`flex items-center justify-center border rounded-xl p-3 cursor-pointer transition-colors ${
+                    formData.role === "user"
+                      ? "border-primary-500 bg-primary-50"
+                      : "border-gray-200"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value="user"
+                    checked={formData.role === "user"}
+                    onChange={handleChange}
+                    className="hidden"
+                  />
+                  <div className="flex items-center">
+                    <FiUser
+                      className={`mr-2 ${
+                        formData.role === "user"
+                          ? "text-primary-600"
+                          : "text-gray-400"
+                      }`}
+                    />
+                    <span
+                      className={
+                        formData.role === "user"
+                          ? "text-primary-600"
+                          : "text-gray-700"
+                      }
+                    >
+                      User
+                    </span>
+                  </div>
+                </label>
+
+                <label
+                  className={`flex items-center justify-center border rounded-xl p-3 cursor-pointer transition-colors ${
+                    formData.role === "admin"
+                      ? "border-primary-500 bg-primary-50"
+                      : "border-gray-200"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="role"
+                    value="admin"
+                    checked={formData.role === "admin"}
+                    onChange={handleChange}
+                    className="hidden"
+                  />
+                  <div className="flex items-center">
+                    <FiUser
+                      className={`mr-2 ${
+                        formData.role === "admin"
+                          ? "text-primary-600"
+                          : "text-gray-400"
+                      }`}
+                    />
+                    <span
+                      className={
+                        formData.role === "admin"
+                          ? "text-primary-600"
+                          : "text-gray-700"
+                      }
+                    >
+                      Admin
+                    </span>
+                  </div>
+                </label>
               </div>
             </div>
 
@@ -143,61 +228,83 @@ export default function RegisterPage() {
                   value={formData.email}
                   onChange={handleChange}
                   className="block w-full py-3 pl-10 pr-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  placeholder="you@example.com"
+                  placeholder="e.g. jhondoe@gmail.com"
                 />
               </div>
             </div>
 
             <div>
               <label
-                htmlFor="password"
+                htmlFor="name"
                 className="block mb-1 text-sm font-medium text-gray-700"
               >
-                Password <span className="text-red-500">*</span>
+                Full Name
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <FiLock className="w-5 h-5 text-gray-400" />
+                  <FiUser className="w-5 h-5 text-gray-400" />
                 </div>
                 <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={formData.password}
+                  id="name"
+                  name="name"
+                  type="text"
+                  value={formData.name}
                   onChange={handleChange}
                   className="block w-full py-3 pl-10 pr-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  placeholder="••••••••"
+                  placeholder="e.g. John Doe"
                 />
               </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Password must be at least 8 characters long
-              </p>
             </div>
 
-            <div>
-              <label
-                htmlFor="passwordRepeat"
-                className="block mb-1 text-sm font-medium text-gray-700"
-              >
-                Confirm Password <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <FiLock className="w-5 h-5 text-gray-400" />
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div>
+                <label
+                  htmlFor="password"
+                  className="block mb-1 text-sm font-medium text-gray-700"
+                >
+                  Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <FiLock className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="block w-full py-3 pl-10 pr-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    placeholder="Password"
+                  />
                 </div>
-                <input
-                  id="passwordRepeat"
-                  name="passwordRepeat"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={formData.passwordRepeat}
-                  onChange={handleChange}
-                  className="block w-full py-3 pl-10 pr-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  placeholder="••••••••"
-                />
+              </div>
+
+              <div>
+                <label
+                  htmlFor="passwordRepeat"
+                  className="block mb-1 text-sm font-medium text-gray-700"
+                >
+                  Confirm Password <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <FiLock className="w-5 h-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="passwordRepeat"
+                    name="passwordRepeat"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    value={formData.passwordRepeat}
+                    onChange={handleChange}
+                    className="block w-full py-3 pl-10 pr-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                    placeholder="Confirm Password"
+                  />
+                </div>
               </div>
             </div>
 
@@ -219,33 +326,11 @@ export default function RegisterPage() {
                   value={formData.phoneNumber}
                   onChange={handleChange}
                   className="block w-full py-3 pl-10 pr-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  placeholder="+62 812 3456 7890"
+                  placeholder="e.g. 08111xxx"
                 />
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center">
-            <input
-              id="terms"
-              name="terms"
-              type="checkbox"
-              required
-              className="w-4 h-4 border-gray-300 rounded text-primary-600 focus:ring-primary-500"
-            />
-            <label htmlFor="terms" className="block ml-2 text-sm text-gray-700">
-              I agree to the{" "}
-              <a href="#" className="text-primary-600 hover:text-primary-500">
-                Terms and Conditions
-              </a>{" "}
-              and{" "}
-              <a href="#" className="text-primary-600 hover:text-primary-500">
-                Privacy Policy
-              </a>
-            </label>
-          </div>
-
-          <div>
             <button
               type="submit"
               disabled={isLoading}
@@ -281,26 +366,45 @@ export default function RegisterPage() {
                 </span>
               ) : (
                 <span className="flex items-center">
-                  Create Account
-                  <FiArrowRight className="w-5 h-5 ml-2" />
+                  Register
+                  <FiArrowRight className="ml-2" />
                 </span>
               )}
             </button>
-          </div>
-        </form>
+          </form>
 
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-medium text-primary-600 hover:text-primary-500"
-            >
-              Sign in
-            </Link>
-          </p>
-        </div>
-      </motion.div>
+          <div className="mt-4 text-sm text-center">
+            <p className="text-gray-600">
+              By clicking continue, you agree to our{" "}
+              <Link
+                href="/terms"
+                className="text-primary-600 hover:text-primary-500"
+              >
+                Terms of Service
+              </Link>{" "}
+              and{" "}
+              <Link
+                href="/privacy"
+                className="text-primary-600 hover:text-primary-500"
+              >
+                Privacy Policy
+              </Link>
+            </p>
+          </div>
+
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="font-medium text-primary-600 hover:text-primary-500"
+              >
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </motion.div>
+      </div>
     </div>
   );
 }

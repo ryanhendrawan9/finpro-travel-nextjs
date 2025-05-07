@@ -1,3 +1,4 @@
+// src/app/transaction/[id]/page.jsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -41,7 +42,7 @@ export default function TransactionDetailPage({ params }) {
       try {
         const response = await transactionService.getById(id);
         setTransaction(response.data.data);
-        setProofPaymentUrl(response.data.data.proofPaymentUrl || "");
+        setProofPaymentUrl(response.data.data?.proofPaymentUrl || "");
       } catch (err) {
         console.error("Error fetching transaction:", err);
         setError("Failed to load transaction details. Please try again later.");
@@ -83,6 +84,74 @@ export default function TransactionDetailPage({ params }) {
     }
   };
 
+  // Format date safely
+  const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
+
+    try {
+      const options = {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      };
+      return new Date(dateString).toLocaleDateString("en-US", options);
+    } catch (e) {
+      console.error("Date formatting error:", e);
+      return "Invalid date";
+    }
+  };
+
+  // Safely format currency
+  const formatCurrency = (value) => {
+    if (value === undefined || value === null) return "Rp 0";
+    try {
+      return `Rp ${value.toLocaleString("id-ID")}`;
+    } catch (e) {
+      console.error("Currency formatting error:", e, "Value:", value);
+      return "Rp 0";
+    }
+  };
+
+  // Get status color
+  const getStatusColor = (status) => {
+    if (!status) return "text-gray-600 bg-gray-100";
+
+    switch (status) {
+      case "waiting-for-payment":
+        return "text-yellow-600 bg-yellow-100";
+      case "waiting-for-confirmation":
+        return "text-blue-600 bg-blue-100";
+      case "success":
+        return "text-green-600 bg-green-100";
+      case "failed":
+      case "canceled":
+        return "text-red-600 bg-red-100";
+      default:
+        return "text-gray-600 bg-gray-100";
+    }
+  };
+
+  // Get status icon
+  const getStatusIcon = (status) => {
+    if (!status) return <FiInfo className="mr-2" />;
+
+    switch (status) {
+      case "waiting-for-payment":
+        return <FiClock className="mr-2" />;
+      case "waiting-for-confirmation":
+        return <FiInfo className="mr-2" />;
+      case "success":
+        return <FiCheckCircle className="mr-2" />;
+      case "failed":
+      case "canceled":
+        return <FiXCircle className="mr-2" />;
+      default:
+        return <FiInfo className="mr-2" />;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -120,52 +189,6 @@ export default function TransactionDetailPage({ params }) {
     cart,
   } = transaction;
 
-  // Format date
-  const formatDate = (dateString) => {
-    const options = {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    };
-    return new Date(dateString).toLocaleDateString("en-US", options);
-  };
-
-  // Get status color
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "waiting-for-payment":
-        return "text-yellow-600 bg-yellow-100";
-      case "waiting-for-confirmation":
-        return "text-blue-600 bg-blue-100";
-      case "success":
-        return "text-green-600 bg-green-100";
-      case "failed":
-      case "canceled":
-        return "text-red-600 bg-red-100";
-      default:
-        return "text-gray-600 bg-gray-100";
-    }
-  };
-
-  // Get status icon
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case "waiting-for-payment":
-        return <FiClock className="mr-2" />;
-      case "waiting-for-confirmation":
-        return <FiInfo className="mr-2" />;
-      case "success":
-        return <FiCheckCircle className="mr-2" />;
-      case "failed":
-      case "canceled":
-        return <FiXCircle className="mr-2" />;
-      default:
-        return <FiInfo className="mr-2" />;
-    }
-  };
-
   const statusClass = getStatusColor(status);
   const StatusIcon = getStatusIcon(status);
 
@@ -195,13 +218,15 @@ export default function TransactionDetailPage({ params }) {
             <div className="flex flex-col justify-between md:flex-row md:items-center">
               <div>
                 <p className="text-sm text-gray-500">Transaction ID</p>
-                <p className="font-medium text-gray-800">{transactionId}</p>
+                <p className="font-medium text-gray-800">
+                  {transactionId || "N/A"}
+                </p>
               </div>
               <div className="mt-2 md:mt-0">
                 <span
                   className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusClass}`}
                 >
-                  {StatusIcon} {status}
+                  {StatusIcon} {status || "Unknown"}
                 </span>
               </div>
             </div>
@@ -218,7 +243,7 @@ export default function TransactionDetailPage({ params }) {
                   <div className="flex items-start">
                     <div className="w-1/3 text-sm text-gray-500">Amount</div>
                     <div className="w-2/3 font-medium text-gray-900">
-                      Rp {amount.toLocaleString("id-ID")}
+                      {formatCurrency(amount)}
                     </div>
                   </div>
                   <div className="flex items-start">
@@ -404,45 +429,50 @@ export default function TransactionDetailPage({ params }) {
 
             <div className="space-y-4">
               {cart &&
-                cart.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex flex-col py-3 border-b border-gray-100 md:flex-row md:items-center"
-                  >
-                    <div className="w-full h-32 mb-3 overflow-hidden rounded-lg md:w-16 md:h-16 md:mb-0 md:mr-4">
-                      <img
-                        src={
-                          item.activity?.imageUrls?.[0] ||
-                          "/images/placeholders/activity-placeholder.jpg"
-                        }
-                        alt={item.activity?.title}
-                        className="object-cover w-full h-full"
-                      />
-                    </div>
+                cart.map((item) => {
+                  // Safely calculate price
+                  const itemPrice =
+                    item.activity?.price_discount || item.activity?.price || 0;
+                  const quantity = item.quantity || 1;
+                  const totalPrice = itemPrice * quantity;
 
-                    <div className="flex-grow">
-                      <h4 className="font-medium text-gray-900">
-                        {item.activity?.title}
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {item.activity?.city}, {item.activity?.province}
-                      </p>
-                    </div>
+                  return (
+                    <div
+                      key={item.id || Math.random().toString(36).substring(7)}
+                      className="flex flex-col py-3 border-b border-gray-100 md:flex-row md:items-center"
+                    >
+                      <div className="w-full h-32 mb-3 overflow-hidden rounded-lg md:w-16 md:h-16 md:mb-0 md:mr-4">
+                        <img
+                          src={
+                            item.activity?.imageUrls?.[0] ||
+                            "/images/placeholders/activity-placeholder.jpg"
+                          }
+                          alt={item.activity?.title || "Activity"}
+                          className="object-cover w-full h-full"
+                        />
+                      </div>
 
-                    <div className="mt-2 text-right md:mt-0">
-                      <p className="text-sm text-gray-500">
-                        Quantity: {item.quantity}
-                      </p>
-                      <p className="font-medium text-gray-900">
-                        Rp{" "}
-                        {(
-                          (item.activity?.price_discount ||
-                            item.activity?.price) * item.quantity
-                        ).toLocaleString("id-ID")}
-                      </p>
+                      <div className="flex-grow">
+                        <h4 className="font-medium text-gray-900">
+                          {item.activity?.title || "Unnamed Activity"}
+                        </h4>
+                        <p className="text-sm text-gray-600">
+                          {item.activity?.city ? `${item.activity.city}, ` : ""}
+                          {item.activity?.province || ""}
+                        </p>
+                      </div>
+
+                      <div className="mt-2 text-right md:mt-0">
+                        <p className="text-sm text-gray-500">
+                          Quantity: {quantity}
+                        </p>
+                        <p className="font-medium text-gray-900">
+                          {formatCurrency(totalPrice)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
             </div>
           </div>
 

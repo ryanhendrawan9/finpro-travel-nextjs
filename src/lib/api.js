@@ -1,7 +1,14 @@
 import axios from "axios";
 
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
-const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const API_KEY =
+  process.env.NEXT_PUBLIC_API_KEY || "24405e01-fbc1-45a5-9f5a-be13afcd757c";
+const BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
+
+// Log configuration in browser environment
+if (typeof window !== "undefined") {
+  console.log("API Configuration:", { API_KEY, BASE_URL });
+}
 
 export const api = axios.create({
   baseURL: BASE_URL,
@@ -19,20 +26,51 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    if (typeof window !== "undefined") {
+      console.log(
+        `[API Request] ${config.method?.toUpperCase() || "GET"} ${config.url}`,
+        config.data || ""
+      );
+    }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error("[API Request Error]", error);
+    return Promise.reject(error);
+  }
 );
 
 // Response interceptor for handling common errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (typeof window !== "undefined") {
+      console.log(
+        `[API Response] ${response.config.method?.toUpperCase() || "GET"} ${
+          response.config.url
+        } - Success:`,
+        response.data
+      );
+    }
+    return response;
+  },
   (error) => {
+    // Log detailed error information
+    console.error(`[API Response Error]`, {
+      url: error.config?.url,
+      method: error.config?.method?.toUpperCase(),
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message,
+    });
+
     // Handle unauthorized errors (401)
     if (error.response && error.response.status === 401) {
       if (typeof window !== "undefined") {
         localStorage.removeItem("token");
-        window.location.href = "/login";
+        // Don't force navigation during SSR
+        if (typeof window !== "undefined") {
+          window.location.href = "/login";
+        }
       }
     }
 

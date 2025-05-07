@@ -1,3 +1,4 @@
+// src/app/cart/page.jsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -47,9 +48,10 @@ export default function CartPage() {
     const fetchPaymentMethods = async () => {
       try {
         const response = await paymentMethodService.getAll();
-        setPaymentMethods(response.data.data || []);
-        if (response.data.data.length > 0) {
-          setSelectedPaymentMethod(response.data.data[0].id);
+        const methods = response.data.data || [];
+        setPaymentMethods(methods);
+        if (methods.length > 0) {
+          setSelectedPaymentMethod(methods[0].id);
         }
       } catch (error) {
         console.error("Error fetching payment methods:", error);
@@ -90,11 +92,22 @@ export default function CartPage() {
       return;
     }
 
+    if (!cartItems || cartItems.length === 0) {
+      setCheckoutError("Your cart is empty");
+      return;
+    }
+
     setIsCheckingOut(true);
     setCheckoutError(null);
 
     try {
-      const cartIds = cartItems.map((item) => item.id);
+      // Safely extract cart IDs
+      const cartIds = cartItems.map((item) => item.id).filter((id) => id);
+
+      if (cartIds.length === 0) {
+        throw new Error("No valid items in cart");
+      }
+
       const response = await transactionService.create({
         cartIds,
         paymentMethodId: selectedPaymentMethod,
@@ -103,11 +116,19 @@ export default function CartPage() {
       // Refresh cart items after successful transaction
       await fetchCartItems();
 
-      // Redirect to transaction detail page
-      router.push(`/transaction/${response.data.data.id}`);
+      // Redirect to transaction detail page if response contains transaction ID
+      if (response.data?.data?.id) {
+        router.push(`/transaction/${response.data.data.id}`);
+      } else {
+        router.push("/transaction"); // Fallback to transactions list
+      }
     } catch (error) {
       console.error("Checkout error:", error);
-      setCheckoutError("Failed to process your order. Please try again.");
+      setCheckoutError(
+        error.response?.data?.message ||
+          error.message ||
+          "Failed to process your order. Please try again."
+      );
     } finally {
       setIsCheckingOut(false);
     }
@@ -146,9 +167,10 @@ export default function CartPage() {
           {/* Cart items */}
           <div className="lg:col-span-2">
             <div className="space-y-4">
-              {cartItems.map((item, index) => (
-                <CartItem key={item.id} item={item} index={index} />
-              ))}
+              {cartItems &&
+                cartItems.map((item, index) => (
+                  <CartItem key={item.id || index} item={item} index={index} />
+                ))}
             </div>
           </div>
 
@@ -221,36 +243,42 @@ export default function CartPage() {
                   Payment Method
                 </h3>
                 <div className="space-y-2">
-                  {paymentMethods.map((method) => (
-                    <label
-                      key={method.id}
-                      className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
-                        selectedPaymentMethod === method.id
-                          ? "border-primary-500 bg-primary-50"
-                          : "border-gray-200 hover:bg-gray-50"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="paymentMethod"
-                        value={method.id}
-                        checked={selectedPaymentMethod === method.id}
-                        onChange={() => setSelectedPaymentMethod(method.id)}
-                        className="w-4 h-4 text-primary-600 focus:ring-primary-500"
-                      />
-                      <div className="flex items-center ml-3">
-                        <img
-                          src={
-                            method.imageUrl ||
-                            "/images/placeholders/payment-placeholder.jpg"
-                          }
-                          alt={method.name}
-                          className="object-contain w-10 h-6 mr-2"
+                  {paymentMethods.length > 0 ? (
+                    paymentMethods.map((method) => (
+                      <label
+                        key={method.id}
+                        className={`flex items-center p-3 border rounded-lg cursor-pointer transition-colors ${
+                          selectedPaymentMethod === method.id
+                            ? "border-primary-500 bg-primary-50"
+                            : "border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value={method.id}
+                          checked={selectedPaymentMethod === method.id}
+                          onChange={() => setSelectedPaymentMethod(method.id)}
+                          className="w-4 h-4 text-primary-600 focus:ring-primary-500"
                         />
-                        <span className="text-gray-700">{method.name}</span>
-                      </div>
-                    </label>
-                  ))}
+                        <div className="flex items-center ml-3">
+                          <img
+                            src={
+                              method.imageUrl ||
+                              "/images/placeholders/payment-placeholder.jpg"
+                            }
+                            alt={method.name}
+                            className="object-contain w-10 h-6 mr-2"
+                          />
+                          <span className="text-gray-700">{method.name}</span>
+                        </div>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="p-3 text-sm italic text-gray-500 border border-gray-200 rounded-lg">
+                      No payment methods available
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -265,9 +293,17 @@ export default function CartPage() {
               {/* Checkout button */}
               <button
                 onClick={handleCheckout}
-                disabled={isCheckingOut || cartItems.length === 0}
+                disabled={
+                  isCheckingOut ||
+                  !cartItems ||
+                  cartItems.length === 0 ||
+                  !selectedPaymentMethod
+                }
                 className={`w-full flex items-center justify-center py-3 px-4 rounded-xl text-white font-medium transition-colors ${
-                  isCheckingOut || cartItems.length === 0
+                  isCheckingOut ||
+                  !cartItems ||
+                  cartItems.length === 0 ||
+                  !selectedPaymentMethod
                     ? "bg-gray-400 cursor-not-allowed"
                     : "bg-primary-600 hover:bg-primary-700"
                 }`}

@@ -39,12 +39,36 @@ export function AuthProvider({ children }) {
     setError(null);
     try {
       const response = await authService.login(credentials);
-      const { token, user } = response.data.data;
+      console.log("Login response:", response.data);
+
+      // Handle different response structures
+      let token, userData;
+
+      // Try to extract token and user data from various possible response structures
+      if (response.data?.data?.token) {
+        token = response.data.data.token;
+        userData = response.data.data.user || response.data.data;
+      } else if (response.data?.token) {
+        token = response.data.token;
+        userData = response.data.user || response.data;
+      } else if (response.data?.data) {
+        // If there's no explicit token property, but there is data
+        token = response.data.data.token || response.headers?.authorization;
+        userData = response.data.data;
+      }
+
+      if (!token) {
+        console.error("No token found in response", response.data);
+        throw new Error("Authentication failed: No token received");
+      }
+
       localStorage.setItem("token", token);
-      setUser(user);
+      setUser(userData);
       toast.success("Login successful!");
-      return { success: true, user };
+
+      return { success: true, user: userData };
     } catch (err) {
+      console.error("Login error details:", err);
       const message =
         err.response?.data?.message || "Login failed. Please try again.";
       setError(message);

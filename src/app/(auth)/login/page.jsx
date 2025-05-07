@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { FiMail, FiLock, FiArrowRight } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
@@ -10,10 +10,20 @@ import { useAuth } from "@/context/AuthContext";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Check if user was just registered
+  useEffect(() => {
+    const registered = searchParams.get("registered");
+    if (registered === "true") {
+      // Could add a success message here
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,7 +33,12 @@ export default function LoginPage() {
     try {
       const result = await login({ email, password });
       if (result.success) {
-        router.push("/");
+        // Redirect based on user role - using optional chaining to avoid the error
+        if (result.user?.role === "admin") {
+          router.push("/admin/dashboard");
+        } else {
+          router.push("/");
+        }
       } else {
         setError(
           result.message || "Login failed. Please check your credentials."
@@ -38,36 +53,71 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen px-4 py-12 bg-gray-50 sm:px-6 lg:px-8">
-      <motion.div
-        className="w-full max-w-md p-10 space-y-8 bg-white shadow-xl rounded-2xl"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div>
-          <h2 className="mt-6 text-3xl font-extrabold text-center text-gray-900 font-heading">
-            Welcome Back!
-          </h2>
-          <p className="mt-2 text-sm text-center text-gray-600">
-            Sign in to access your account and continue exploring amazing
-            destinations
-          </p>
+    <div className="flex min-h-screen">
+      {/* Left side image - visible on medium screens and up */}
+      <div className="hidden md:block md:w-1/2 bg-primary-600">
+        <div className="relative h-full">
+          <img
+            src="/images/travel-bg.jpg"
+            alt="Travel"
+            className="object-cover w-full h-full"
+          />
+          <div className="absolute inset-0 flex flex-col justify-center p-12">
+            <div className="text-white">
+              <h1 className="mb-6 text-4xl font-bold font-heading">
+                Let's Travel The Beautiful World Together
+              </h1>
+              <p className="text-lg text-white/90">
+                We always make our customer happy by providing as many choices
+                as possible
+              </p>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {error && (
-          <motion.div
-            className="p-4 text-sm text-red-800 rounded-lg bg-red-50"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            transition={{ duration: 0.3 }}
-          >
-            {error}
-          </motion.div>
-        )}
+      {/* Login form */}
+      <div className="flex items-center justify-center w-full p-6 md:w-1/2">
+        <motion.div
+          className="w-full max-w-md p-8 space-y-6 bg-white shadow-lg rounded-2xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div>
+            <Link
+              href="/"
+              className="flex items-center mb-6 text-gray-600 hover:text-gray-800"
+            >
+              <FiArrowRight className="mr-2 rotate-180" /> Back
+            </Link>
+            <h2 className="text-3xl font-bold text-gray-900 font-heading">
+              Welcome back!
+            </h2>
+            <p className="mt-2 text-sm text-gray-600">
+              Start your journey with one click, explore the beautiful world!
+              Don't have an account?{" "}
+              <Link
+                href="/register"
+                className="text-primary-600 hover:text-primary-500"
+              >
+                Register
+              </Link>
+            </p>
+          </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="space-y-4 rounded-md shadow-sm">
+          {error && (
+            <motion.div
+              className="p-4 text-sm text-red-800 rounded-lg bg-red-50"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              transition={{ duration: 0.3 }}
+            >
+              {error}
+            </motion.div>
+          )}
+
+          <form className="space-y-6" onSubmit={handleSubmit}>
             <div>
               <label
                 htmlFor="email"
@@ -88,7 +138,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="block w-full py-3 pl-10 pr-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  placeholder="you@example.com"
+                  placeholder="e.g. jhondoe@gmail.com"
                 />
               </div>
             </div>
@@ -113,39 +163,39 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="block w-full py-3 pl-10 pr-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  placeholder="••••••••"
+                  placeholder="Password"
                 />
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <input
-                id="remember-me"
-                name="remember-me"
-                type="checkbox"
-                className="w-4 h-4 border-gray-300 rounded text-primary-600 focus:ring-primary-500"
-              />
-              <label
-                htmlFor="remember-me"
-                className="block ml-2 text-sm text-gray-700"
-              >
-                Remember me
-              </label>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <input
+                  id="remember-me"
+                  name="remember-me"
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={() => setRememberMe(!rememberMe)}
+                  className="w-4 h-4 border-gray-300 rounded text-primary-600 focus:ring-primary-500"
+                />
+                <label
+                  htmlFor="remember-me"
+                  className="block ml-2 text-sm text-gray-700"
+                >
+                  Remember me?
+                </label>
+              </div>
+
+              <div className="text-sm">
+                <Link
+                  href="/forgot-password"
+                  className="font-medium text-primary-600 hover:text-primary-500"
+                >
+                  Forgot Password?
+                </Link>
+              </div>
             </div>
 
-            <div className="text-sm">
-              <a
-                href="#"
-                className="font-medium text-primary-600 hover:text-primary-500"
-              >
-                Forgot your password?
-              </a>
-            </div>
-          </div>
-
-          <div>
             <button
               type="submit"
               disabled={isLoading}
@@ -180,27 +230,15 @@ export default function LoginPage() {
                   Signing in...
                 </span>
               ) : (
-                <span className="flex items-center">
-                  Sign in
-                  <FiArrowRight className="w-5 h-5 ml-2" />
+                <span className="flex items-center justify-center">
+                  Login
+                  <FiArrowRight className="ml-2" />
                 </span>
               )}
             </button>
-          </div>
-        </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-600">
-            Don't have an account yet?{" "}
-            <Link
-              href="/register"
-              className="font-medium text-primary-600 hover:text-primary-500"
-            >
-              Sign up now
-            </Link>
-          </p>
-        </div>
-      </motion.div>
+          </form>
+        </motion.div>
+      </div>
     </div>
   );
 }

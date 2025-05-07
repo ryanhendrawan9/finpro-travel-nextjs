@@ -179,6 +179,8 @@ export default function Navbar() {
                         <p className="font-medium">{user.name || user.email}</p>
                         <p className="text-xs text-gray-500">{user.role}</p>
                       </div>
+
+                      {/* Menu items for all users */}
                       <Link
                         href="/profile"
                         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
@@ -186,22 +188,38 @@ export default function Navbar() {
                       >
                         Profile
                       </Link>
-                      <Link
-                        href="/transaction"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        onClick={() => setIsProfileOpen(false)}
-                      >
-                        Transactions
-                      </Link>
-                      {user.role === "admin" && (
+
+                      {/* User-specific menu items */}
+                      {user.role === "user" && (
                         <Link
-                          href="/admin/dashboard"
+                          href="/transaction"
                           className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                           onClick={() => setIsProfileOpen(false)}
                         >
-                          Admin Dashboard
+                          My Orders
                         </Link>
                       )}
+
+                      {/* Admin-specific menu items */}
+                      {user.role === "admin" && (
+                        <>
+                          <Link
+                            href="/admin/dashboard"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setIsProfileOpen(false)}
+                          >
+                            Dashboard
+                          </Link>
+                          <Link
+                            href="/transaction"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setIsProfileOpen(false)}
+                          >
+                            Transactions
+                          </Link>
+                        </>
+                      )}
+
                       <button
                         className="block w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-gray-100"
                         onClick={() => {
@@ -352,22 +370,38 @@ export default function Navbar() {
                     >
                       Cart ({totalItems})
                     </Link>
-                    <Link
-                      href="/transaction"
-                      className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Transactions
-                    </Link>
-                    {user.role === "admin" && (
+
+                    {/* User-specific mobile menu items */}
+                    {user.role === "user" && (
                       <Link
-                        href="/admin/dashboard"
+                        href="/transaction"
                         className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                         onClick={() => setIsMenuOpen(false)}
                       >
-                        Admin Dashboard
+                        My Orders
                       </Link>
                     )}
+
+                    {/* Admin-specific mobile menu items */}
+                    {user.role === "admin" && (
+                      <>
+                        <Link
+                          href="/admin/dashboard"
+                          className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Dashboard
+                        </Link>
+                        <Link
+                          href="/transaction"
+                          className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          Transactions
+                        </Link>
+                      </>
+                    )}
+
                     <button
                       className="flex items-center w-full px-3 py-2 font-medium text-left text-red-600 rounded-md hover:bg-primary-50 hover:text-red-700"
                       onClick={() => {
