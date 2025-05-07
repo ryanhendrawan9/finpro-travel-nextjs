@@ -27,18 +27,18 @@ export default function Footer() {
 
   return (
     <motion.footer
-      className="bg-gray-900 text-gray-300"
+      className="text-gray-300 bg-gray-900"
       variants={footerVariants}
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true }}
     >
       {/* Main footer content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+      <div className="px-4 py-16 mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-4">
           {/* Company info */}
           <div>
-            <h3 className="text-white text-xl font-bold mb-4">TravelBright</h3>
+            <h3 className="mb-4 text-xl font-bold text-white">TravelBright</h3>
             <p className="mb-4">
               Discover extraordinary destinations and create unforgettable
               memories with our curated travel experiences.
@@ -46,25 +46,25 @@ export default function Footer() {
             <div className="flex space-x-4">
               <a
                 href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 transition-colors hover:text-white"
               >
                 <FiFacebook size={20} />
               </a>
               <a
                 href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 transition-colors hover:text-white"
               >
                 <FiTwitter size={20} />
               </a>
               <a
                 href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 transition-colors hover:text-white"
               >
                 <FiInstagram size={20} />
               </a>
               <a
                 href="#"
-                className="text-gray-400 hover:text-white transition-colors"
+                className="text-gray-400 transition-colors hover:text-white"
               >
                 <FiYoutube size={20} />
               </a>
@@ -73,20 +73,28 @@ export default function Footer() {
 
           {/* Quick links */}
           <div>
-            <h3 className="text-white text-lg font-bold mb-4">Quick Links</h3>
+            <h3 className="mb-4 text-lg font-bold text-white">Quick Links</h3>
             <ul className="space-y-2">
               <li>
                 <Link
                   href="/"
-                  className="hover:text-primary-400 transition-colors"
+                  className="transition-colors hover:text-primary-400"
                 >
                   Home
                 </Link>
               </li>
               <li>
                 <Link
+                  href="/banner"
+                  className="transition-colors hover:text-primary-400"
+                >
+                  Banners
+                </Link>
+              </li>
+              <li>
+                <Link
                   href="/category"
-                  className="hover:text-primary-400 transition-colors"
+                  className="transition-colors hover:text-primary-400"
                 >
                   Categories
                 </Link>
@@ -94,7 +102,7 @@ export default function Footer() {
               <li>
                 <Link
                   href="/activity"
-                  className="hover:text-primary-400 transition-colors"
+                  className="transition-colors hover:text-primary-400"
                 >
                   Activities
                 </Link>
@@ -102,25 +110,9 @@ export default function Footer() {
               <li>
                 <Link
                   href="/promo"
-                  className="hover:text-primary-400 transition-colors"
+                  className="transition-colors hover:text-primary-400"
                 >
                   Promos
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/about"
-                  className="hover:text-primary-400 transition-colors"
-                >
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/contact"
-                  className="hover:text-primary-400 transition-colors"
-                >
-                  Contact Us
                 </Link>
               </li>
             </ul>
@@ -128,44 +120,44 @@ export default function Footer() {
 
           {/* Support */}
           <div>
-            <h3 className="text-white text-lg font-bold mb-4">Support</h3>
+            <h3 className="mb-4 text-lg font-bold text-white">Support</h3>
             <ul className="space-y-2">
               <li>
                 <Link
-                  href="/faq"
-                  className="hover:text-primary-400 transition-colors"
+                  href="#"
+                  className="transition-colors hover:text-primary-400"
                 >
                   FAQ
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/terms"
-                  className="hover:text-primary-400 transition-colors"
+                  href="#"
+                  className="transition-colors hover:text-primary-400"
                 >
                   Terms & Conditions
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/privacy"
-                  className="hover:text-primary-400 transition-colors"
+                  href="#"
+                  className="transition-colors hover:text-primary-400"
                 >
                   Privacy Policy
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/cancellation"
-                  className="hover:text-primary-400 transition-colors"
+                  href="#"
+                  className="transition-colors hover:text-primary-400"
                 >
                   Cancellation Policy
                 </Link>
               </li>
               <li>
                 <Link
-                  href="/help"
-                  className="hover:text-primary-400 transition-colors"
+                  href="#"
+                  className="transition-colors hover:text-primary-400"
                 >
                   Help Center
                 </Link>
@@ -175,18 +167,18 @@ export default function Footer() {
 
           {/* Contact */}
           <div>
-            <h3 className="text-white text-lg font-bold mb-4">Contact Us</h3>
+            <h3 className="mb-4 text-lg font-bold text-white">Contact Us</h3>
             <ul className="space-y-3">
               <li className="flex items-start">
-                <FiMapPin className="mt-1 mr-3 text-primary-400 flex-shrink-0" />
+                <FiMapPin className="flex-shrink-0 mt-1 mr-3 text-primary-400" />
                 <span>Jl. Sudirman No. 123, Jakarta Pusat, Indonesia</span>
               </li>
               <li className="flex items-center">
-                <FiPhone className="mr-3 text-primary-400 flex-shrink-0" />
+                <FiPhone className="flex-shrink-0 mr-3 text-primary-400" />
                 <span>+62 812 3456 7890</span>
               </li>
               <li className="flex items-center">
-                <FiMail className="mr-3 text-primary-400 flex-shrink-0" />
+                <FiMail className="flex-shrink-0 mr-3 text-primary-400" />
                 <span>info@travelbright.com</span>
               </li>
             </ul>
@@ -194,57 +186,31 @@ export default function Footer() {
         </div>
       </div>
 
-      {/* Newsletter */}
-      <div className="bg-gray-800 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <div className="mb-4 md:mb-0">
-              <h3 className="text-white text-lg font-bold mb-1">
-                Subscribe to our Newsletter
-              </h3>
-              <p className="text-gray-400">
-                Get the latest travel deals and updates straight to your inbox
-              </p>
-            </div>
-            <div className="flex w-full md:w-auto">
-              <input
-                type="email"
-                placeholder="Your email address"
-                className="px-4 py-2 bg-gray-700 text-white border border-gray-600 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-primary-500 w-full md:w-64"
-              />
-              <button className="bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-r-lg transition-colors">
-                Subscribe
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Bottom footer */}
-      <div className="bg-gray-950 py-6">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between">
-            <p className="text-gray-500 text-sm">
+      <div className="py-6 bg-gray-950">
+        <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+          <div className="flex flex-col items-center justify-between md:flex-row">
+            <p className="text-sm text-gray-500">
               &copy; {new Date().getFullYear()} TravelBright. All rights
               reserved.
             </p>
             <div className="mt-4 md:mt-0">
               <div className="flex space-x-6 text-sm text-gray-500">
                 <Link
-                  href="/terms"
-                  className="hover:text-gray-400 transition-colors"
+                  href="#"
+                  className="transition-colors hover:text-gray-400"
                 >
                   Terms
                 </Link>
                 <Link
-                  href="/privacy"
-                  className="hover:text-gray-400 transition-colors"
+                  href="#"
+                  className="transition-colors hover:text-gray-400"
                 >
                   Privacy
                 </Link>
                 <Link
-                  href="/cookies"
-                  className="hover:text-gray-400 transition-colors"
+                  href="#"
+                  className="transition-colors hover:text-gray-400"
                 >
                   Cookies
                 </Link>

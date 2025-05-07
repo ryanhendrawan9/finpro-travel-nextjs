@@ -82,6 +82,14 @@ export default function Navbar() {
               Home
             </Link>
             <Link
+              href="/banner"
+              className={`font-medium hover:text-primary-500 transition-colors ${
+                pathname.startsWith("/banner") ? "text-primary-500" : ""
+              }`}
+            >
+              Banners
+            </Link>
+            <Link
               href="/category"
               className={`font-medium hover:text-primary-500 transition-colors ${
                 pathname.startsWith("/category") ? "text-primary-500" : ""
@@ -275,6 +283,13 @@ export default function Navbar() {
                 onClick={() => setIsMenuOpen(false)}
               >
                 Home
+              </Link>
+              <Link
+                href="/banner"
+                className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                Banners
               </Link>
               <Link
                 href="/category"

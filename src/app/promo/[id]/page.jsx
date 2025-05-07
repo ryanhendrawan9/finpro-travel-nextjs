@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -16,7 +16,9 @@ import { promoService, activityService } from "@/lib/api";
 import ActivityCard from "@/components/activity/activity-card";
 
 export default function PromoDetailPage({ params }) {
-  const { id } = params;
+  const unwrappedParams = use(params);
+  const id = unwrappedParams.id;
+
   const [promo, setPromo] = useState(null);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);

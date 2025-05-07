@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
+import Link from "next/link";
 
 export default function BannerSlider({ banners }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -101,13 +102,17 @@ export default function BannerSlider({ banners }) {
                   >
                     Discover amazing destinations and unforgettable experiences
                   </motion.p>
-                  <motion.button
+                  <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0, transition: { delay: 0.7 } }}
-                    className="px-6 py-3 font-medium text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
                   >
-                    Explore Now
-                  </motion.button>
+                    <Link
+                      href={`/banner/${banners[currentIndex].id}`}
+                      className="inline-block px-6 py-3 font-medium text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
+                    >
+                      Explore Now
+                    </Link>
+                  </motion.div>
                 </div>
               </div>
             </div>
