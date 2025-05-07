@@ -79,28 +79,32 @@ export default function BannerSlider({ banners }) {
                   "/images/placeholders/banner-placeholder.jpg"
                 }
                 alt={banners[currentIndex].name}
-                className="w-full h-full object-cover"
+                className="object-cover w-full h-full"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = "/images/placeholders/banner-placeholder.jpg";
+                }}
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent flex items-center">
-                <div className="pl-8 md:pl-16 lg:pl-24 max-w-lg">
+              <div className="absolute inset-0 flex items-center bg-gradient-to-r from-black/60 to-transparent">
+                <div className="max-w-lg pl-8 md:pl-16 lg:pl-24">
                   <motion.h2
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0, transition: { delay: 0.3 } }}
-                    className="text-3xl md:text-4xl lg:text-5xl font-bold text-white font-heading mb-4"
+                    className="mb-4 text-3xl font-bold text-white md:text-4xl lg:text-5xl font-heading"
                   >
                     {banners[currentIndex].name}
                   </motion.h2>
                   <motion.p
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0, transition: { delay: 0.5 } }}
-                    className="text-white/90 text-lg mb-6 hidden md:block"
+                    className="hidden mb-6 text-lg text-white/90 md:block"
                   >
                     Discover amazing destinations and unforgettable experiences
                   </motion.p>
                   <motion.button
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0, transition: { delay: 0.7 } }}
-                    className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-medium transition-colors"
+                    className="px-6 py-3 font-medium text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
                   >
                     Explore Now
                   </motion.button>
@@ -113,14 +117,14 @@ export default function BannerSlider({ banners }) {
 
       {/* Controls */}
       <button
-        className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-2 rounded-full transition-colors"
+        className="absolute p-2 text-white transition-colors -translate-y-1/2 rounded-full left-4 top-1/2 bg-white/20 hover:bg-white/30 backdrop-blur-sm"
         onClick={prevSlide}
         aria-label="Previous banner"
       >
         <FiChevronLeft size={24} />
       </button>
       <button
-        className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-2 rounded-full transition-colors"
+        className="absolute p-2 text-white transition-colors -translate-y-1/2 rounded-full right-4 top-1/2 bg-white/20 hover:bg-white/30 backdrop-blur-sm"
         onClick={nextSlide}
         aria-label="Next banner"
       >
@@ -128,7 +132,7 @@ export default function BannerSlider({ banners }) {
       </button>
 
       {/* Indicators */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-2">
+      <div className="absolute flex space-x-2 -translate-x-1/2 bottom-4 left-1/2">
         {banners.map((_, index) => (
           <button
             key={index}

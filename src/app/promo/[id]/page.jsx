@@ -112,6 +112,10 @@ export default function PromoDetailPage({ params }) {
                   }
                   alt={promo.title}
                   className="object-cover w-full h-full"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "/images/placeholders/promo-placeholder.jpg";
+                  }}
                 />
                 <div className="absolute px-3 py-1 text-sm font-bold text-white rounded-full top-4 right-4 bg-accent-500">
                   {Math.floor(Math.random() * 70) + 10}% OFF

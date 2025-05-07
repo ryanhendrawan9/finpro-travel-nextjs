@@ -72,18 +72,17 @@ export default function ActivityCard({ activity, index }) {
     },
   };
 
-  // More robust check for image URL
   // Define a guaranteed fallback path
   const FALLBACK_IMAGE = "/images/placeholders/activity-placeholder.jpg";
 
-  // Check if imageUrls exists, is an array, has length > 0, and the first item is a non-empty string
-  const hasValidImage =
-    Array.isArray(imageUrls) &&
-    imageUrls.length > 0 &&
-    typeof imageUrls[0] === "string" &&
-    imageUrls[0].trim() !== "";
-
-  const imageUrl = hasValidImage ? imageUrls[0] : FALLBACK_IMAGE;
+  // Improved image URL validation
+  let imageUrl = FALLBACK_IMAGE;
+  if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+    const firstImage = imageUrls[0];
+    if (typeof firstImage === "string" && firstImage.trim() !== "") {
+      imageUrl = firstImage;
+    }
+  }
 
   // Calculate discount percentage if there's a discounted price
   const discountPercentage =
@@ -105,22 +104,16 @@ export default function ActivityCard({ activity, index }) {
         <div className="flex flex-col h-full overflow-hidden transition-shadow bg-white rounded-2xl shadow-card hover:shadow-card-hover">
           {/* Image */}
           <div className="relative w-full h-48 overflow-hidden">
-            {/* Only render the image if we have a valid URL */}
-            {imageUrl && (
-              <img
-                src={imageUrl}
-                alt={title || "Activity"}
-                className="object-cover w-full h-full transition-transform duration-700"
-                style={{ transform: isHovered ? "scale(1.1)" : "scale(1)" }}
-              />
-            )}
-
-            {/* If no valid image URL, show a placeholder div */}
-            {!imageUrl && (
-              <div className="flex items-center justify-center w-full h-full bg-gray-200">
-                <span className="text-gray-500">No image available</span>
-              </div>
-            )}
+            <img
+              src={imageUrl}
+              alt={title || "Activity"}
+              className="object-cover w-full h-full transition-transform duration-700"
+              style={{ transform: isHovered ? "scale(1.1)" : "scale(1)" }}
+              onError={(e) => {
+                e.target.onerror = null;
+                e.target.src = FALLBACK_IMAGE;
+              }}
+            />
 
             {/* Discount badge */}
             {discountPercentage > 0 && (

@@ -107,6 +107,11 @@ export default function PromosPage() {
                     }
                     alt={promos[0]?.title || "Featured Promo"}
                     className="object-cover w-full h-full"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "/images/placeholders/promo-placeholder.jpg";
+                    }}
                   />
                   <div className="absolute px-3 py-1 text-sm font-bold text-white rounded-full top-4 left-4 bg-accent-500">
                     HOT DEAL
@@ -169,6 +174,11 @@ export default function PromosPage() {
                     }
                     alt={promo.title}
                     className="object-cover w-full h-48"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "/images/placeholders/promo-placeholder.jpg";
+                    }}
                   />
                   <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/70 to-transparent" />
                   <div className="absolute px-3 py-1 text-sm font-bold text-white rounded-full top-4 right-4 bg-accent-500">

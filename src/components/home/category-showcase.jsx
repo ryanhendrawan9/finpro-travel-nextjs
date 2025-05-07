@@ -43,10 +43,10 @@ export default function CategoryShowcase({ categories }) {
     <div className="relative">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 font-heading">
+          <h2 className="text-2xl font-bold text-gray-900 md:text-3xl font-heading">
             Explore Categories
           </h2>
-          <p className="text-gray-600 mt-2 max-w-2xl">
+          <p className="max-w-2xl mt-2 text-gray-600">
             Discover a variety of amazing experiences and activities by category
           </p>
         </div>
@@ -54,14 +54,14 @@ export default function CategoryShowcase({ categories }) {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => scroll("left")}
-            className="p-2 rounded-full bg-white text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors"
+            className="p-2 text-gray-700 transition-colors bg-white border border-gray-200 rounded-full hover:bg-gray-100"
             aria-label="Scroll left"
           >
             <FiChevronLeft size={20} />
           </button>
           <button
             onClick={() => scroll("right")}
-            className="p-2 rounded-full bg-white text-gray-700 hover:bg-gray-100 border border-gray-200 transition-colors"
+            className="p-2 text-gray-700 transition-colors bg-white border border-gray-200 rounded-full hover:bg-gray-100"
             aria-label="Scroll right"
           >
             <FiChevronRight size={20} />
@@ -71,7 +71,7 @@ export default function CategoryShowcase({ categories }) {
 
       <div
         ref={scrollRef}
-        className="flex space-x-6 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4"
+        className="flex px-4 pb-4 -mx-4 space-x-6 overflow-x-auto scrollbar-hide"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         <motion.div
@@ -88,23 +88,28 @@ export default function CategoryShowcase({ categories }) {
               className="flex-shrink-0"
             >
               <Link href={`/category/${category.id}`}>
-                <div className="relative group w-64 h-72 rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-shadow duration-300">
+                <div className="relative w-64 overflow-hidden transition-shadow duration-300 shadow-md group h-72 rounded-2xl hover:shadow-xl">
                   <img
                     src={
                       category.imageUrl ||
                       "/images/placeholders/category-placeholder.jpg"
                     }
                     alt={category.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-110"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "/images/placeholders/category-placeholder.jpg";
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <h3 className="text-xl font-bold text-white mb-2">
+                    <h3 className="mb-2 text-xl font-bold text-white">
                       {category.name}
                     </h3>
-                    <div className="flex items-center text-white font-medium">
+                    <div className="flex items-center font-medium text-white">
                       <span>Explore</span>
-                      <FiChevronRight className="ml-1 group-hover:ml-2 transition-all duration-300" />
+                      <FiChevronRight className="ml-1 transition-all duration-300 group-hover:ml-2" />
                     </div>
                   </div>
                 </div>

@@ -56,10 +56,10 @@ export default function Navbar() {
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
+      <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <div className="flex-shrink-0 flex items-center">
+          <div className="flex items-center flex-shrink-0">
             <Link href="/" className="flex items-center">
               <span
                 className={`font-bold text-2xl ${
@@ -72,7 +72,7 @@ export default function Navbar() {
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="items-center hidden space-x-8 md:flex">
             <Link
               href="/"
               className={`font-medium hover:text-primary-500 transition-colors ${
@@ -108,11 +108,11 @@ export default function Navbar() {
           </div>
 
           {/* User actions */}
-          <div className="hidden md:flex items-center space-x-6">
+          <div className="items-center hidden space-x-6 md:flex">
             {/* Cart */}
             <Link
               href="/cart"
-              className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+              className="relative p-2 transition-colors rounded-full hover:bg-gray-100"
             >
               <FiShoppingCart
                 size={22}
@@ -121,7 +121,7 @@ export default function Navbar() {
                 }
               />
               {isAuthenticated && totalItems > 0 && (
-                <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                <span className="absolute flex items-center justify-center w-5 h-5 text-xs font-bold text-white rounded-full -top-1 -right-1 bg-primary-600">
                   {totalItems}
                 </span>
               )}
@@ -134,14 +134,19 @@ export default function Navbar() {
                   className="flex items-center space-x-1 focus:outline-none"
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                 >
-                  <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-primary-500">
+                  <div className="overflow-hidden border-2 rounded-full w-9 h-9 border-primary-500">
                     <img
                       src={
                         user.profilePictureUrl ||
                         "/images/placeholders/user-placeholder.jpg"
                       }
                       alt="Profile"
-                      className="w-full h-full object-cover"
+                      className="object-cover w-full h-full"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src =
+                          "/images/placeholders/user-placeholder.jpg";
+                      }}
                     />
                   </div>
                   <FiChevronDown
@@ -156,7 +161,7 @@ export default function Navbar() {
                 <AnimatePresence>
                   {isProfileOpen && (
                     <motion.div
-                      className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10"
+                      className="absolute right-0 z-10 w-48 py-1 mt-2 bg-white rounded-md shadow-lg"
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -10 }}
@@ -164,7 +169,7 @@ export default function Navbar() {
                     >
                       <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
                         <p className="font-medium">{user.name || user.email}</p>
-                        <p className="text-gray-500 text-xs">{user.role}</p>
+                        <p className="text-xs text-gray-500">{user.role}</p>
                       </div>
                       <Link
                         href="/profile"
@@ -190,7 +195,7 @@ export default function Navbar() {
                         </Link>
                       )}
                       <button
-                        className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                        className="block w-full px-4 py-2 text-sm text-left text-red-600 hover:bg-gray-100"
                         onClick={() => {
                           setIsProfileOpen(false);
                           logout();
@@ -219,7 +224,7 @@ export default function Navbar() {
                 </Link>
                 <Link
                   href="/register"
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors font-medium"
+                  className="px-4 py-2 font-medium text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
                 >
                   Register
                 </Link>
@@ -228,7 +233,7 @@ export default function Navbar() {
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center">
+          <div className="flex items-center md:hidden">
             <button
               className="p-2 rounded-md focus:outline-none"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -257,7 +262,7 @@ export default function Navbar() {
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div
-            className="md:hidden bg-white"
+            className="bg-white md:hidden"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -266,44 +271,49 @@ export default function Navbar() {
             <div className="px-2 pt-2 pb-3 space-y-1 shadow-lg">
               <Link
                 href="/"
-                className="block px-3 py-2 rounded-md text-gray-700 font-medium hover:bg-primary-50 hover:text-primary-600"
+                className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Home
               </Link>
               <Link
                 href="/category"
-                className="block px-3 py-2 rounded-md text-gray-700 font-medium hover:bg-primary-50 hover:text-primary-600"
+                className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Categories
               </Link>
               <Link
                 href="/activity"
-                className="block px-3 py-2 rounded-md text-gray-700 font-medium hover:bg-primary-50 hover:text-primary-600"
+                className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Activities
               </Link>
               <Link
                 href="/promo"
-                className="block px-3 py-2 rounded-md text-gray-700 font-medium hover:bg-primary-50 hover:text-primary-600"
+                className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                 onClick={() => setIsMenuOpen(false)}
               >
                 Promos
               </Link>
-              <div className="border-t border-gray-200 pt-3">
+              <div className="pt-3 border-t border-gray-200">
                 {isAuthenticated ? (
                   <>
                     <div className="flex items-center px-3 py-2">
-                      <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-primary-500">
+                      <div className="w-8 h-8 overflow-hidden border-2 rounded-full border-primary-500">
                         <img
                           src={
                             user.profilePictureUrl ||
                             "/images/placeholders/user-placeholder.jpg"
                           }
                           alt="Profile"
-                          className="w-full h-full object-cover"
+                          className="object-cover w-full h-full"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src =
+                              "/images/placeholders/user-placeholder.jpg";
+                          }}
                         />
                       </div>
                       <div className="ml-3">
@@ -315,21 +325,21 @@ export default function Navbar() {
                     </div>
                     <Link
                       href="/profile"
-                      className="block px-3 py-2 rounded-md text-gray-700 font-medium hover:bg-primary-50 hover:text-primary-600"
+                      className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Profile
                     </Link>
                     <Link
                       href="/cart"
-                      className="block px-3 py-2 rounded-md text-gray-700 font-medium hover:bg-primary-50 hover:text-primary-600"
+                      className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Cart ({totalItems})
                     </Link>
                     <Link
                       href="/transaction"
-                      className="block px-3 py-2 rounded-md text-gray-700 font-medium hover:bg-primary-50 hover:text-primary-600"
+                      className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Transactions
@@ -337,14 +347,14 @@ export default function Navbar() {
                     {user.role === "admin" && (
                       <Link
                         href="/admin/dashboard"
-                        className="block px-3 py-2 rounded-md text-gray-700 font-medium hover:bg-primary-50 hover:text-primary-600"
+                        className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                         onClick={() => setIsMenuOpen(false)}
                       >
                         Admin Dashboard
                       </Link>
                     )}
                     <button
-                      className="w-full text-left px-3 py-2 rounded-md text-red-600 font-medium hover:bg-primary-50 hover:text-red-700 flex items-center"
+                      className="flex items-center w-full px-3 py-2 font-medium text-left text-red-600 rounded-md hover:bg-primary-50 hover:text-red-700"
                       onClick={() => {
                         setIsMenuOpen(false);
                         logout();
@@ -354,17 +364,17 @@ export default function Navbar() {
                     </button>
                   </>
                 ) : (
-                  <div className="flex flex-col space-y-2 px-3">
+                  <div className="flex flex-col px-3 space-y-2">
                     <Link
                       href="/login"
-                      className="px-4 py-2 text-center bg-primary-50 text-primary-600 rounded-lg font-medium hover:bg-primary-100 transition-colors"
+                      className="px-4 py-2 font-medium text-center transition-colors rounded-lg bg-primary-50 text-primary-600 hover:bg-primary-100"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Login
                     </Link>
                     <Link
                       href="/register"
-                      className="px-4 py-2 text-center bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 transition-colors"
+                      className="px-4 py-2 font-medium text-center text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
                       onClick={() => setIsMenuOpen(false)}
                     >
                       Register

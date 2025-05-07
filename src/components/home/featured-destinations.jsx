@@ -30,18 +30,18 @@ export default function FeaturedDestinations({ activities = [] }) {
 
   return (
     <div>
-      <div className="text-center mb-12">
-        <h2 className="text-2xl md:text-3xl font-bold text-gray-900 font-heading mb-4">
+      <div className="mb-12 text-center">
+        <h2 className="mb-4 text-2xl font-bold text-gray-900 md:text-3xl font-heading">
           Featured Destinations
         </h2>
-        <p className="text-gray-600 max-w-3xl mx-auto">
+        <p className="max-w-3xl mx-auto text-gray-600">
           Explore these handpicked destinations and experience the best of what
           they have to offer
         </p>
       </div>
 
       <motion.div
-        className="grid grid-cols-1 md:grid-cols-3 gap-8"
+        className="grid grid-cols-1 gap-8 md:grid-cols-3"
         variants={containerVariants}
         initial="hidden"
         whileInView="visible"
@@ -54,35 +54,40 @@ export default function FeaturedDestinations({ activities = [] }) {
                 variants={itemVariants}
                 className="relative"
               >
-                <div className="relative h-96 rounded-2xl overflow-hidden group">
+                <div className="relative overflow-hidden h-96 rounded-2xl group">
                   <img
                     src={
                       activity.imageUrls?.[0] ||
                       "/images/placeholders/activity-placeholder.jpg"
                     }
                     alt={activity.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-110"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "/images/placeholders/activity-placeholder.jpg";
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
                   <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <div className="flex items-center text-white/80 mb-2">
+                    <div className="flex items-center mb-2 text-white/80">
                       <FiMapPin className="mr-1" />
                       <span>
                         {activity.city}, {activity.province}
                       </span>
                     </div>
 
-                    <h3 className="text-xl font-bold text-white mb-3">
+                    <h3 className="mb-3 text-xl font-bold text-white">
                       {activity.title}
                     </h3>
 
                     <Link
                       href={`/activity/${activity.id}`}
-                      className="inline-flex items-center text-white hover:text-primary-300 font-medium transition-colors"
+                      className="inline-flex items-center font-medium text-white transition-colors hover:text-primary-300"
                     >
                       Explore{" "}
-                      <FiArrowRight className="ml-1 group-hover:ml-2 transition-all duration-300" />
+                      <FiArrowRight className="ml-1 transition-all duration-300 group-hover:ml-2" />
                     </Link>
                   </div>
                 </div>
@@ -91,22 +96,22 @@ export default function FeaturedDestinations({ activities = [] }) {
           : // Placeholder destinations if no activities are provided
             [1, 2, 3].map((i) => (
               <motion.div key={i} variants={itemVariants} className="relative">
-                <div className="relative h-96 rounded-2xl overflow-hidden bg-gray-200 group">
+                <div className="relative overflow-hidden bg-gray-200 h-96 rounded-2xl group">
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
                   <div className="absolute bottom-0 left-0 right-0 p-6">
-                    <div className="flex items-center text-white/80 mb-2">
+                    <div className="flex items-center mb-2 text-white/80">
                       <FiMapPin className="mr-1" />
                       <span>Featured Location</span>
                     </div>
 
-                    <h3 className="text-xl font-bold text-white mb-3">
+                    <h3 className="mb-3 text-xl font-bold text-white">
                       Amazing Destination
                     </h3>
 
-                    <span className="inline-flex items-center text-white font-medium">
+                    <span className="inline-flex items-center font-medium text-white">
                       Explore{" "}
-                      <FiArrowRight className="ml-1 group-hover:ml-2 transition-all duration-300" />
+                      <FiArrowRight className="ml-1 transition-all duration-300 group-hover:ml-2" />
                     </span>
                   </div>
                 </div>

@@ -54,6 +54,10 @@ export default function ActivityGallery({
             src={galleryImages[0]}
             alt={`${title} - Main Image`}
             className="object-cover w-full h-full transition-transform duration-700 hover:scale-105"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "/images/placeholders/activity-placeholder.jpg";
+            }}
           />
         </div>
 
@@ -69,6 +73,11 @@ export default function ActivityGallery({
                 src={image}
                 alt={`${title} - Image ${index + 2}`}
                 className="object-cover w-full h-full transition-transform duration-700 hover:scale-105"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src =
+                    "/images/placeholders/activity-placeholder.jpg";
+                }}
               />
             </div>
           ))}
@@ -137,6 +146,11 @@ export default function ActivityGallery({
                 alt={`${title} - Image ${selectedImageIndex + 1}`}
                 className="max-h-[90vh] max-w-[90vw] object-contain"
                 onClick={(e) => e.stopPropagation()}
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src =
+                    "/images/placeholders/activity-placeholder.jpg";
+                }}
               />
 
               {/* Next button */}

@@ -108,6 +108,11 @@ export default function CategoriesPage() {
                     }
                     alt={category.name}
                     className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-110"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "/images/placeholders/category-placeholder.jpg";
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
                   <div className="absolute bottom-0 left-0 right-0 p-6">
@@ -152,6 +157,11 @@ export default function CategoriesPage() {
                     }
                     alt={categories[0]?.name || "Featured Category"}
                     className="object-cover w-full h-full"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src =
+                        "/images/placeholders/category-placeholder.jpg";
+                    }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-r from-black/60 to-transparent lg:hidden" />
                 </div>

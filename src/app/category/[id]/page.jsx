@@ -132,6 +132,10 @@ export default function CategoryDetailPage({ params }) {
             }
             alt={category.name}
             className="object-cover w-full h-full"
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = "/images/placeholders/category-placeholder.jpg";
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">

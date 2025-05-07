@@ -52,10 +52,10 @@ export default function PromoSection({ promos = [] }) {
     <div>
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 font-heading">
+          <h2 className="text-2xl font-bold text-gray-900 md:text-3xl font-heading">
             Special Promos & Deals
           </h2>
-          <p className="text-gray-600 mt-2">
+          <p className="mt-2 text-gray-600">
             Limited-time offers and exclusive discounts for your next adventure
           </p>
         </div>
@@ -63,14 +63,14 @@ export default function PromoSection({ promos = [] }) {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => scroll("left")}
-            className="p-2 rounded-full bg-white text-gray-700 hover:bg-gray-100 border border-gray-300 transition-colors"
+            className="p-2 text-gray-700 transition-colors bg-white border border-gray-300 rounded-full hover:bg-gray-100"
             aria-label="Scroll left"
           >
             <FiChevronLeft size={20} />
           </button>
           <button
             onClick={() => scroll("right")}
-            className="p-2 rounded-full bg-white text-gray-700 hover:bg-gray-100 border border-gray-300 transition-colors"
+            className="p-2 text-gray-700 transition-colors bg-white border border-gray-300 rounded-full hover:bg-gray-100"
             aria-label="Scroll right"
           >
             <FiChevronRight size={20} />
@@ -80,7 +80,7 @@ export default function PromoSection({ promos = [] }) {
 
       <div
         ref={scrollRef}
-        className="flex space-x-6 overflow-x-auto scrollbar-hide pb-4 -mx-4 px-4"
+        className="flex px-4 pb-4 -mx-4 space-x-6 overflow-x-auto scrollbar-hide"
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
       >
         <motion.div
@@ -98,7 +98,7 @@ export default function PromoSection({ promos = [] }) {
               className="flex-shrink-0 w-80"
             >
               <Link href={`/promo/${promo.id}`}>
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow h-full flex flex-col">
+                <div className="flex flex-col h-full overflow-hidden transition-shadow bg-white shadow-sm rounded-xl hover:shadow-md">
                   <div className="relative">
                     <img
                       src={
@@ -106,23 +106,28 @@ export default function PromoSection({ promos = [] }) {
                         "/images/placeholders/promo-placeholder.jpg"
                       }
                       alt={promo.title}
-                      className="w-full h-48 object-cover"
+                      className="object-cover w-full h-48"
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src =
+                          "/images/placeholders/promo-placeholder.jpg";
+                      }}
                     />
-                    <div className="absolute top-4 right-4 bg-accent-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                    <div className="absolute px-3 py-1 text-sm font-bold text-white rounded-full top-4 right-4 bg-accent-500">
                       {Math.floor(Math.random() * 70) + 10}% OFF
                     </div>
                   </div>
 
-                  <div className="p-6 flex flex-col flex-grow">
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  <div className="flex flex-col flex-grow p-6">
+                    <h3 className="mb-2 text-lg font-bold text-gray-900">
                       {promo.title}
                     </h3>
-                    <p className="text-gray-600 text-sm line-clamp-3 mb-4 flex-grow">
+                    <p className="flex-grow mb-4 text-sm text-gray-600 line-clamp-3">
                       {promo.description}
                     </p>
 
                     <div className="flex items-center justify-between mt-auto">
-                      <div className="bg-primary-50 text-primary-600 px-3 py-1 rounded-lg text-sm font-medium flex items-center">
+                      <div className="flex items-center px-3 py-1 text-sm font-medium rounded-lg bg-primary-50 text-primary-600">
                         <FiTag className="mr-1" size={14} />
                         {promo.promo_code}
                       </div>
@@ -142,7 +147,7 @@ export default function PromoSection({ promos = [] }) {
       <div className="mt-8 text-center">
         <Link
           href="/promo"
-          className="inline-flex items-center text-primary-600 hover:text-primary-700 font-medium"
+          className="inline-flex items-center font-medium text-primary-600 hover:text-primary-700"
         >
           View All Promos <FiArrowRight className="ml-2" />
         </Link>
