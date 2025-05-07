@@ -77,15 +77,6 @@ export default function BannersPage() {
   return (
     <div className="min-h-screen pt-24 pb-16 bg-gray-50">
       <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="flex items-center text-gray-600 transition-colors hover:text-primary-600"
-          >
-            <FiArrowLeft className="mr-2" /> Back to Home
-          </Link>
-        </div>
-
         {/* Header */}
         <div className="mb-12 text-center">
           <h1 className="mb-4 text-3xl font-bold text-gray-900 md:text-4xl font-heading">

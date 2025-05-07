@@ -76,12 +76,11 @@ export default function CategoriesPage() {
 
   return (
     <div className="min-h-screen pt-24 pb-16 bg-gray-50">
-      <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+      <div className="px-4 mx-auto text-center max-w-7xl sm:px-6 lg:px-8">
         <h1 className="mb-6 text-3xl font-bold text-gray-900 font-heading">
           Explore Categories
         </h1>
-
-        <p className="max-w-3xl mb-12 text-gray-600">
+        <p className="max-w-3xl mx-auto mb-12 text-gray-600">
           Discover a variety of amazing travel experiences and activities by
           category. From adventurous outdoor activities to relaxing cultural
           tours, we have something for everyone.

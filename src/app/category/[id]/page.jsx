@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -9,9 +9,7 @@ import { categoryService, activityService } from "@/lib/api";
 import ActivityCard from "@/components/activity/activity-card";
 
 export default function CategoryDetailPage({ params }) {
-  const unwrappedParams = use(params);
-  const id = unwrappedParams.id;
-
+  const { id } = params;
   const [category, setCategory] = useState(null);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);

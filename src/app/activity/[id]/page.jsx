@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -23,9 +23,7 @@ import ActivityReviews from "@/components/activity/activity-reviews";
 import RelatedActivities from "@/components/activity/related-activities";
 
 export default function ActivityDetailPage({ params }) {
-  const unwrappedParams = use(params);
-  const id = unwrappedParams.id;
-
+  const { id } = params;
   const [activity, setActivity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
