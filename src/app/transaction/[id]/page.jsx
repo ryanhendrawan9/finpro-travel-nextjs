@@ -1,7 +1,7 @@
 // src/app/transaction/[id]/page.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -20,7 +20,7 @@ import { transactionService } from "@/lib/api";
 import { toast } from "react-toastify";
 
 export default function TransactionDetailPage({ params }) {
-  const { id } = params;
+  const id = use(params).id;
   const [transaction, setTransaction] = useState(null);
   const [calculatedAmount, setCalculatedAmount] = useState(0);
   const [loading, setLoading] = useState(true);

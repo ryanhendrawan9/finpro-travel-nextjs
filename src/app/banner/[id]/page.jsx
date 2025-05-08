@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -9,7 +9,7 @@ import { bannerService, activityService } from "@/lib/api";
 import ActivityCard from "@/components/activity/activity-card";
 
 export default function BannerDetailPage({ params }) {
-  const { id } = params;
+  const id = use(params).id;
   const [banner, setBanner] = useState(null);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
