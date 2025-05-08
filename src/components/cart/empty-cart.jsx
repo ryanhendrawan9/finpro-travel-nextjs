@@ -41,28 +41,6 @@ export default function EmptyCart() {
               View Promos
             </Link>
           </div>
-
-          <div className="pt-8 mt-12 border-t border-gray-100">
-            <h3 className="mb-4 text-lg font-medium text-gray-900">
-              Recommended For You
-            </h3>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              {/* Placeholder recommended activities */}
-              {[1, 2, 3].map((item) => (
-                <div
-                  key={item}
-                  className="relative overflow-hidden rounded-lg shadow-sm group"
-                >
-                  <div className="bg-gray-200 aspect-w-16 aspect-h-9 animate-pulse"></div>
-                  <div className="p-3">
-                    <div className="w-3/4 h-5 mb-2 bg-gray-200 rounded animate-pulse"></div>
-                    <div className="w-1/2 h-4 bg-gray-200 rounded animate-pulse"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </motion.div>
       </div>
     </div>

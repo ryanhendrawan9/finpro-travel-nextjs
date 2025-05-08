@@ -33,12 +33,15 @@ export default function LoginPage() {
     try {
       const result = await login({ email, password });
       if (result.success) {
-        // Redirect based on user role - using optional chaining to avoid the error
-        if (result.user?.role === "admin") {
-          router.push("/admin/dashboard");
-        } else {
-          router.push("/");
-        }
+        // Important: Add a small delay before redirecting to ensure auth state is updated
+        setTimeout(() => {
+          // Redirect based on user role - using optional chaining to avoid the error
+          if (result.user?.role === "admin") {
+            window.location.href = "/admin/dashboard";
+          } else {
+            window.location.href = "/";
+          }
+        }, 300);
       } else {
         setError(
           result.message || "Login failed. Please check your credentials."
