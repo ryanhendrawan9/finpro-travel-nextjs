@@ -1,4 +1,3 @@
-// src/app/admin/transactions/page.jsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -14,6 +13,9 @@ import {
   FiInfo,
   FiExternalLink,
   FiFilter,
+  FiEye,
+  FiDollarSign,
+  FiUser,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 import { transactionService } from "@/lib/api";
@@ -28,6 +30,10 @@ export default function AdminTransactions() {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const transactionsPerPage = 10;
 
   // Auth check
   useEffect(() => {
@@ -41,7 +47,7 @@ export default function AdminTransactions() {
     const fetchTransactions = async () => {
       try {
         const response = await transactionService.getAllTransactions();
-        console.log("Admin transactions:", response.data);
+        console.log("Admin transactions data:", response.data);
 
         // Process transactions to ensure they have valid amounts
         const processedTransactions = (response.data.data || []).map(
@@ -111,7 +117,22 @@ export default function AdminTransactions() {
     });
 
     setFilteredTransactions(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
   }, [searchQuery, statusFilter, transactions]);
+
+  // Pagination
+  const indexOfLastTransaction = currentPage * transactionsPerPage;
+  const indexOfFirstTransaction = indexOfLastTransaction - transactionsPerPage;
+  const currentTransactions = filteredTransactions.slice(
+    indexOfFirstTransaction,
+    indexOfLastTransaction
+  );
+  const totalPages = Math.ceil(
+    filteredTransactions.length / transactionsPerPage
+  );
+
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   // Format date
   const formatDate = (dateString) => {
@@ -132,7 +153,7 @@ export default function AdminTransactions() {
     }
   };
 
-  // Safely format currency
+  // Format currency
   const formatCurrency = (value) => {
     if (value === undefined || value === null) return "Rp 0";
     try {
@@ -200,17 +221,31 @@ export default function AdminTransactions() {
       await transactionService.updateStatus(id, { status });
 
       // Update local state
-      setTransactions((prevTransactions) =>
-        prevTransactions.map((trans) =>
-          trans.id === id ? { ...trans, status } : trans
+      const updatedTransactions = transactions.map((trans) =>
+        trans.id === id ? { ...trans, status } : trans
+      );
+
+      setTransactions(updatedTransactions);
+      setFilteredTransactions(
+        updatedTransactions.filter(
+          (trans) => statusFilter === "all" || trans.status === statusFilter
         )
       );
+
+      setIsModalOpen(false);
+      setSelectedTransaction(null);
 
       toast.success(`Transaction status updated to ${status}`);
     } catch (error) {
       console.error("Error updating transaction status:", error);
       toast.error("Failed to update transaction status");
     }
+  };
+
+  // View transaction details
+  const viewTransactionDetails = (transaction) => {
+    setSelectedTransaction(transaction);
+    setIsModalOpen(true);
   };
 
   if (loading || isLoading) {
@@ -316,9 +351,9 @@ export default function AdminTransactions() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredTransactions.map((transaction) => {
+                {currentTransactions.map((transaction) => {
                   const statusDetails = getStatusDetails(transaction?.status);
-                  const shortId = transaction.id.substring(0, 8);
+                  const shortId = transaction.id?.substring(0, 8) || "unknown";
 
                   return (
                     <tr key={transaction.id}>
@@ -326,6 +361,33 @@ export default function AdminTransactions() {
                         #{shortId}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 mr-3 overflow-hidden rounded-full">
+                            <img
+                              src={
+                                transaction.user?.profilePictureUrl ||
+                                "/images/placeholders/user-placeholder.jpg"
+                              }
+                              alt={transaction.user?.name || "User"}
+                              className="object-cover w-full h-full"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src =
+                                  "/images/placeholders/user-placeholder.jpg";
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {transaction.user?.name || "Unknown user"}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {transaction.user?.email || "No email"}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
                         {formatCurrency(transaction.amount)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -340,12 +402,20 @@ export default function AdminTransactions() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                         <div className="flex items-center space-x-2">
-                          <Link
-                            href={`/transaction/${transaction.id}`}
+                          <button
+                            onClick={() => viewTransactionDetails(transaction)}
                             className="p-1 text-blue-600 transition-colors rounded-md hover:bg-blue-50"
                             title="View details"
                           >
-                            <FiExternalLink size={16} />
+                            <FiEye size={18} />
+                          </button>
+
+                          <Link
+                            href={`/transaction/${transaction.id}`}
+                            className="p-1 text-green-600 transition-colors rounded-md hover:bg-green-50"
+                            title="View transaction page"
+                          >
+                            <FiExternalLink size={18} />
                           </Link>
 
                           {transaction.status ===
@@ -358,7 +428,7 @@ export default function AdminTransactions() {
                                 className="p-1 text-green-600 transition-colors rounded-md hover:bg-green-50"
                                 title="Approve payment"
                               >
-                                <FiCheckCircle size={16} />
+                                <FiCheckCircle size={18} />
                               </button>
                               <button
                                 onClick={() =>
@@ -367,7 +437,7 @@ export default function AdminTransactions() {
                                 className="p-1 text-red-600 transition-colors rounded-md hover:bg-red-50"
                                 title="Reject payment"
                               >
-                                <FiXCircle size={16} />
+                                <FiXCircle size={18} />
                               </button>
                             </>
                           )}
@@ -391,7 +461,291 @@ export default function AdminTransactions() {
             </table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center mt-6 space-x-2">
+            <button
+              onClick={() => paginate(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 rounded-md ${
+                currentPage === 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => (
+              <button
+                key={i + 1}
+                onClick={() => paginate(i + 1)}
+                className={`px-3 py-1 rounded-md ${
+                  currentPage === i + 1
+                    ? "bg-primary-600 text-white"
+                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                }`}
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 rounded-md ${
+                currentPage === totalPages
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Transaction details modal */}
+      {isModalOpen && selectedTransaction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="w-full max-w-4xl p-6 bg-white rounded-xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                Transaction Details
+              </h2>
+              <button
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setSelectedTransaction(null);
+                }}
+                className="p-2 text-gray-500 transition-colors rounded-full hover:bg-gray-100"
+              >
+                <FiXCircle size={20} />
+              </button>
+            </div>
+
+            <div className="p-4 mb-4 border rounded-lg bg-gray-50">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <div className="text-sm text-gray-500">Transaction ID</div>
+                  <div className="font-medium">{selectedTransaction.id}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Date</div>
+                  <div className="font-medium">
+                    {formatDate(selectedTransaction.createdAt)}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-500">Status</div>
+                  <div>
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        getStatusDetails(selectedTransaction.status).color
+                      }`}
+                    >
+                      {getStatusDetails(selectedTransaction.status).icon}
+                      {getStatusDetails(selectedTransaction.status).text}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              {/* Customer info */}
+              <div className="p-4 border rounded-lg">
+                <h3 className="flex items-center mb-3 text-lg font-medium text-gray-900">
+                  <FiUser className="mr-2" />
+                  Customer Information
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500">Name</span>
+                    <span className="font-medium">
+                      {selectedTransaction.user?.name || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500">Email</span>
+                    <span className="font-medium">
+                      {selectedTransaction.user?.email || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500">Phone</span>
+                    <span className="font-medium">
+                      {selectedTransaction.user?.phoneNumber || "N/A"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment details */}
+              <div className="p-4 border rounded-lg">
+                <h3 className="flex items-center mb-3 text-lg font-medium text-gray-900">
+                  <FiDollarSign className="mr-2" />
+                  Payment Details
+                </h3>
+                <div className="space-y-2">
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500">Amount</span>
+                    <span className="text-xl font-bold text-primary-600">
+                      {formatCurrency(selectedTransaction.amount)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500">
+                      Payment Method
+                    </span>
+                    <span className="font-medium">
+                      {selectedTransaction.paymentMethod?.name || "N/A"}
+                    </span>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm text-gray-500">
+                      Proof of Payment
+                    </span>
+                    {selectedTransaction.proofPaymentUrl ? (
+                      <a
+                        href={selectedTransaction.proofPaymentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-blue-600 hover:underline"
+                      >
+                        View Payment Proof <FiExternalLink className="ml-1" />
+                      </a>
+                    ) : (
+                      <span className="text-red-500">No proof uploaded</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Items */}
+            <div className="mt-6">
+              <h3 className="mb-3 text-lg font-medium text-gray-900">
+                Items ({selectedTransaction.cart?.length || 0})
+              </h3>
+              <div className="overflow-hidden border rounded-lg">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
+                      >
+                        Item
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
+                      >
+                        Price
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
+                      >
+                        Quantity
+                      </th>
+                      <th
+                        scope="col"
+                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
+                      >
+                        Total
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {selectedTransaction.cart &&
+                      selectedTransaction.cart.map((item, index) => {
+                        const price =
+                          item.activity?.price_discount ||
+                          item.activity?.price ||
+                          0;
+                        const quantity = item.quantity || 1;
+                        const itemTotal = price * quantity;
+
+                        return (
+                          <tr key={item.id || index}>
+                            <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <div className="w-10 h-10 mr-3 overflow-hidden rounded-lg">
+                                  <img
+                                    src={
+                                      item.activity?.imageUrls?.[0] ||
+                                      "/images/placeholders/activity-placeholder.jpg"
+                                    }
+                                    alt={item.activity?.title || "Activity"}
+                                    className="object-cover w-full h-full"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src =
+                                        "/images/placeholders/activity-placeholder.jpg";
+                                    }}
+                                  />
+                                </div>
+                                <div className="font-medium">
+                                  {item.activity?.title || "Unknown Activity"}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                              {formatCurrency(price)}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                              {quantity}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                              {formatCurrency(itemTotal)}
+                            </td>
+                          </tr>
+                        );
+                      })}
+
+                    {(!selectedTransaction.cart ||
+                      selectedTransaction.cart.length === 0) && (
+                      <tr>
+                        <td
+                          colSpan="4"
+                          className="px-6 py-4 text-sm text-center text-gray-500"
+                        >
+                          No items found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Actions */}
+            {selectedTransaction.status === "waiting-for-confirmation" && (
+              <div className="flex justify-end mt-6 space-x-4">
+                <button
+                  onClick={() =>
+                    handleUpdateStatus(selectedTransaction.id, "failed")
+                  }
+                  className="px-4 py-2 text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700"
+                >
+                  <FiXCircle className="inline-block mr-2" />
+                  Reject Payment
+                </button>
+                <button
+                  onClick={() =>
+                    handleUpdateStatus(selectedTransaction.id, "success")
+                  }
+                  className="px-4 py-2 text-white transition-colors bg-green-600 rounded-lg hover:bg-green-700"
+                >
+                  <FiCheckCircle className="inline-block mr-2" />
+                  Approve Payment
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

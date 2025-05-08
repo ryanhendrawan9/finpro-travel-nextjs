@@ -1,4 +1,3 @@
-// src/app/admin/dashboard/page.jsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -11,8 +10,9 @@ import {
   FiTag,
   FiGrid,
   FiImage,
-  FiEdit,
   FiExternalLink,
+  FiActivity,
+  FiPercent,
 } from "react-icons/fi";
 
 import { useAuth } from "@/context/AuthContext";
@@ -35,6 +35,8 @@ export default function AdminDashboard() {
     transactions: 0,
     categories: 0,
     pendingOrders: 0,
+    activities: 0,
+    promos: 0,
   });
 
   // Recent transactions
@@ -55,12 +57,13 @@ export default function AdminDashboard() {
           setDataLoading(true);
 
           // Fetch data in parallel
-          const [users, transactions, categories, activities] =
+          const [users, transactions, categories, activities, promos] =
             await Promise.all([
               authService.getAllUsers(),
               transactionService.getAllTransactions(),
               categoryService.getAll(),
               activityService.getAll(),
+              promoService.getAll(),
             ]);
 
           console.log("Dashboard data loaded");
@@ -79,6 +82,8 @@ export default function AdminDashboard() {
             transactions: transactions.data.data?.length || 0,
             categories: categories.data.data?.length || 0,
             pendingOrders: pendingTransactions.length || 0,
+            activities: activities.data.data?.length || 0,
+            promos: promos.data.data?.length || 0,
           });
 
           // Get recent transactions - latest 5
@@ -214,13 +219,13 @@ export default function AdminDashboard() {
             className="p-6 bg-white shadow-sm rounded-xl dashboard-stat-card"
           >
             <div className="flex items-center">
-              <div className="p-3 mr-4 bg-orange-100 rounded-lg">
-                <FiGrid className="text-xl text-orange-600" />
+              <div className="p-3 mr-4 bg-indigo-100 rounded-lg">
+                <FiActivity className="text-xl text-indigo-600" />
               </div>
               <div>
-                <h3 className="text-sm text-gray-500">Categories</h3>
+                <h3 className="text-sm text-gray-500">Activities</h3>
                 <p className="text-2xl font-bold text-gray-900">
-                  {stats.categories}
+                  {stats.activities}
                 </p>
               </div>
             </div>
@@ -250,13 +255,13 @@ export default function AdminDashboard() {
           <h2 className="mb-4 text-xl font-bold text-gray-900">
             Quick Actions
           </h2>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
             <Link
               href="/admin/users"
               className="flex flex-col items-center justify-center p-4 transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
             >
               <FiUsers className="mb-2 text-2xl text-gray-700" />
-              <span className="text-sm text-gray-700">Manage Users</span>
+              <span className="text-sm text-gray-700">Users</span>
             </Link>
 
             <Link
@@ -273,6 +278,22 @@ export default function AdminDashboard() {
             >
               <FiGrid className="mb-2 text-2xl text-gray-700" />
               <span className="text-sm text-gray-700">Categories</span>
+            </Link>
+
+            <Link
+              href="/admin/activities"
+              className="flex flex-col items-center justify-center p-4 transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
+            >
+              <FiActivity className="mb-2 text-2xl text-gray-700" />
+              <span className="text-sm text-gray-700">Activities</span>
+            </Link>
+
+            <Link
+              href="/admin/promos"
+              className="flex flex-col items-center justify-center p-4 transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
+            >
+              <FiPercent className="mb-2 text-2xl text-gray-700" />
+              <span className="text-sm text-gray-700">Promos</span>
             </Link>
 
             <Link

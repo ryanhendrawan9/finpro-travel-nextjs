@@ -1,9 +1,7 @@
 import axios from "axios";
 
-const API_KEY =
-  process.env.NEXT_PUBLIC_API_KEY || "24405e01-fbc1-45a5-9f5a-be13afcd757c";
-const BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:4000";
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // Log configuration in browser environment
 if (typeof window !== "undefined") {
@@ -54,23 +52,23 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Log detailed error information
-    console.error(`[API Response Error]`, {
-      url: error.config?.url,
-      method: error.config?.method?.toUpperCase(),
-      status: error.response?.status,
-      data: error.response?.data,
-      message: error.message,
-    });
+    // Fix: Check if error.config exists before accessing properties
+    const errorDetails = {
+      url: error.config?.url || "unknown",
+      method: error.config?.method?.toUpperCase() || "unknown",
+      status: error.response?.status || "unknown",
+      data: error.response?.data || {},
+      message: error.message || "Unknown error",
+    };
+
+    console.error(`[API Response Error]`, errorDetails);
 
     // Handle unauthorized errors (401)
     if (error.response && error.response.status === 401) {
       if (typeof window !== "undefined") {
         localStorage.removeItem("token");
         // Don't force navigation during SSR
-        if (typeof window !== "undefined") {
-          window.location.href = "/login";
-        }
+        window.location.href = "/login";
       }
     }
 
