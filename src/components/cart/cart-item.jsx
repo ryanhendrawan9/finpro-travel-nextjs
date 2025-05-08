@@ -19,8 +19,17 @@ export default function CartItem({ item, index }) {
     await removeFromCart(id);
   };
 
-  const itemPrice = activity.price_discount || activity.price;
-  const totalPrice = itemPrice * quantity;
+  // Ensure safe data handling
+  const safeActivity = activity || {};
+  const rawPrice = safeActivity.price_discount || safeActivity.price || 0;
+  const itemPrice = parseInt(rawPrice) || 0; // Ensure it's always an integer
+  const safeQuantity = parseInt(quantity) || 1; // Ensure it's always an integer
+  const totalPrice = itemPrice * safeQuantity;
+
+  // Log calculation for debugging
+  console.log(
+    `Cart item: ${safeActivity.title}, Price: ${itemPrice}, Qty: ${safeQuantity}, Total: ${totalPrice}`
+  );
 
   return (
     <motion.div
@@ -34,10 +43,10 @@ export default function CartItem({ item, index }) {
         <div className="w-full h-32 overflow-hidden rounded-lg md:w-48">
           <img
             src={
-              activity.imageUrls?.[0] ||
+              safeActivity.imageUrls?.[0] ||
               "/images/placeholders/activity-placeholder.jpg"
             }
-            alt={activity.title}
+            alt={safeActivity.title || "Activity"}
             className="object-cover w-full h-full"
           />
         </div>
@@ -45,27 +54,29 @@ export default function CartItem({ item, index }) {
         {/* Activity details */}
         <div className="flex-grow">
           <h3 className="mb-1 text-lg font-bold text-gray-800">
-            {activity.title}
+            {safeActivity.title || "Unnamed Activity"}
           </h3>
           <p className="mb-2 text-sm text-gray-600">
-            {activity.city}, {activity.province}
+            {safeActivity.city || ""}
+            {safeActivity.city ? ", " : ""}
+            {safeActivity.province || ""}
           </p>
 
           <div className="flex flex-col justify-between mt-4 md:flex-row md:items-center">
             <div className="flex items-center mb-4 md:mb-0">
               <button
                 className="p-2 text-gray-600 transition-colors border border-gray-300 rounded-l-lg hover:bg-gray-100"
-                onClick={() => handleQuantityChange(quantity - 1)}
-                disabled={quantity <= 1}
+                onClick={() => handleQuantityChange(safeQuantity - 1)}
+                disabled={safeQuantity <= 1}
               >
                 <FiMinus size={16} />
               </button>
               <div className="px-4 py-1 border-t border-b border-gray-300 flex items-center justify-center min-w-[40px]">
-                {quantity}
+                {safeQuantity}
               </div>
               <button
                 className="p-2 text-gray-600 transition-colors border border-gray-300 rounded-r-lg hover:bg-gray-100"
-                onClick={() => handleQuantityChange(quantity + 1)}
+                onClick={() => handleQuantityChange(safeQuantity + 1)}
               >
                 <FiPlus size={16} />
               </button>
@@ -80,9 +91,9 @@ export default function CartItem({ item, index }) {
 
             <div className="text-right">
               <div className="flex flex-col">
-                {activity.price_discount && (
+                {safeActivity.price_discount && safeActivity.price && (
                   <span className="text-xs text-gray-500 line-through">
-                    Rp {activity.price.toLocaleString("id-ID")}
+                    Rp {parseInt(safeActivity.price).toLocaleString("id-ID")}
                   </span>
                 )}
                 <div className="flex items-center">
@@ -90,7 +101,7 @@ export default function CartItem({ item, index }) {
                     Rp {itemPrice.toLocaleString("id-ID")}
                   </span>
                   <span className="mx-2 text-gray-500">×</span>
-                  <span className="text-gray-700">{quantity}</span>
+                  <span className="text-gray-700">{safeQuantity}</span>
                 </div>
                 <span className="mt-1 text-lg font-bold text-gray-800">
                   Rp {totalPrice.toLocaleString("id-ID")}

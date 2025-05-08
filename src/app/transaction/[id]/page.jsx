@@ -17,10 +17,12 @@ import {
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 import { transactionService } from "@/lib/api";
+import { toast } from "react-toastify";
 
 export default function TransactionDetailPage({ params }) {
   const { id } = params;
   const [transaction, setTransaction] = useState(null);
+  const [calculatedAmount, setCalculatedAmount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [proofPaymentUrl, setProofPaymentUrl] = useState("");
@@ -41,8 +43,46 @@ export default function TransactionDetailPage({ params }) {
     const fetchTransaction = async () => {
       try {
         const response = await transactionService.getById(id);
-        setTransaction(response.data.data);
-        setProofPaymentUrl(response.data.data?.proofPaymentUrl || "");
+        console.log("Transaction data received:", response.data.data);
+
+        const transactionData = response.data.data;
+
+        // Calculate amount from items if needed
+        if (!transactionData.amount || transactionData.amount === 0) {
+          console.log(
+            "Transaction amount missing or zero, calculating from cart items"
+          );
+
+          if (transactionData.cart && transactionData.cart.length > 0) {
+            let calculatedTotal = 0;
+
+            transactionData.cart.forEach((item) => {
+              if (item.activity) {
+                const price =
+                  item.activity.price_discount || item.activity.price || 0;
+                const quantity = item.quantity || 1;
+                const itemTotal = parseInt(price) * parseInt(quantity);
+                calculatedTotal += itemTotal;
+                console.log(
+                  `Item: ${item.activity.title}, Price: ${price}, Qty: ${quantity}, Total: ${itemTotal}`
+                );
+              }
+            });
+
+            console.log("Total calculated from items:", calculatedTotal);
+
+            // Set the calculated amount for display
+            setCalculatedAmount(calculatedTotal);
+
+            // Update transaction data with calculated amount
+            if (calculatedTotal > 0) {
+              transactionData.amount = calculatedTotal;
+            }
+          }
+        }
+
+        setTransaction(transactionData);
+        setProofPaymentUrl(transactionData?.proofPaymentUrl || "");
       } catch (err) {
         console.error("Error fetching transaction:", err);
         setError("Failed to load transaction details. Please try again later.");
@@ -75,7 +115,7 @@ export default function TransactionDetailPage({ params }) {
       const response = await transactionService.getById(id);
       setTransaction(response.data.data);
 
-      alert("Payment proof uploaded successfully!");
+      toast.success("Payment proof uploaded successfully!");
     } catch (err) {
       console.error("Error uploading proof payment:", err);
       setUploadError("Failed to upload payment proof. Please try again.");
@@ -105,9 +145,22 @@ export default function TransactionDetailPage({ params }) {
 
   // Safely format currency
   const formatCurrency = (value) => {
-    if (value === undefined || value === null) return "Rp 0";
+    // If value is missing but we have a calculated amount, use that
+    if (
+      (value === undefined || value === null || value === 0) &&
+      calculatedAmount > 0
+    ) {
+      return `Rp ${calculatedAmount.toLocaleString("id-ID")}`;
+    }
+
+    if (value === undefined || value === null) {
+      return "Rp 0";
+    }
+
     try {
-      return `Rp ${value.toLocaleString("id-ID")}`;
+      // Parse to float if it's a string
+      const numValue = typeof value === "string" ? parseFloat(value) : value;
+      return `Rp ${numValue.toLocaleString("id-ID")}`;
     } catch (e) {
       console.error("Currency formatting error:", e, "Value:", value);
       return "Rp 0";
@@ -187,10 +240,15 @@ export default function TransactionDetailPage({ params }) {
     proofPaymentUrl: currentProofUrl,
     paymentMethod,
     cart,
+    promoDiscount,
+    promoCode,
   } = transaction;
 
   const statusClass = getStatusColor(status);
   const StatusIcon = getStatusIcon(status);
+
+  // Calculate display amount (use either transaction amount or calculated amount)
+  const displayAmount = amount || calculatedAmount;
 
   return (
     <div className="py-20 bg-gray-50">
@@ -243,9 +301,26 @@ export default function TransactionDetailPage({ params }) {
                   <div className="flex items-start">
                     <div className="w-1/3 text-sm text-gray-500">Amount</div>
                     <div className="w-2/3 font-medium text-gray-900">
-                      {formatCurrency(amount)}
+                      {formatCurrency(displayAmount)}
                     </div>
                   </div>
+
+                  {promoCode && promoDiscount > 0 && (
+                    <div className="flex items-start">
+                      <div className="w-1/3 text-sm text-gray-500">
+                        Promo Applied
+                      </div>
+                      <div className="w-2/3">
+                        <span className="font-medium text-green-600">
+                          {promoCode}
+                        </span>
+                        <span className="ml-2 text-green-600">
+                          (-{formatCurrency(promoDiscount)})
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-start">
                     <div className="w-1/3 text-sm text-gray-500">
                       Payment Method

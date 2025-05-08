@@ -143,10 +143,28 @@ export const cartService = {
 
 // Transaction services
 export const transactionService = {
-  getById: (id) => api.get(`/api/v1/transaction/${id}`),
-  getMyTransactions: () => api.get("/api/v1/my-transactions"),
+  getById: (id) => {
+    console.log(`Getting transaction with ID: ${id}`);
+    return api.get(`/api/v1/transaction/${id}`).then((response) => {
+      console.log("Transaction data received:", response.data);
+      return response;
+    });
+  },
+  getMyTransactions: () => {
+    console.log("Fetching my transactions");
+    return api.get("/api/v1/my-transactions").then((response) => {
+      console.log("My transactions data received:", response.data);
+      return response;
+    });
+  },
   getAllTransactions: () => api.get("/api/v1/all-transactions"),
-  create: (data) => api.post("/api/v1/create-transaction", data),
+  create: (data) => {
+    console.log("Creating transaction with data:", data);
+    return api.post("/api/v1/create-transaction", data).then((response) => {
+      console.log("Transaction creation response:", response.data);
+      return response;
+    });
+  },
   cancel: (id) => api.post(`/api/v1/cancel-transaction/${id}`),
   updateProofPayment: (id, data) =>
     api.post(`/api/v1/update-transaction-proof-payment/${id}`, data),

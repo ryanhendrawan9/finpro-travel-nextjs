@@ -35,7 +35,36 @@ export default function TransactionsPage() {
     const fetchTransactions = async () => {
       try {
         const response = await transactionService.getMyTransactions();
-        setTransactions(response.data.data || []);
+        console.log("Transactions data:", response.data);
+
+        // Process transactions to ensure they have valid amounts
+        const processedTransactions = (response.data.data || []).map(
+          (transaction) => {
+            // If amount is missing or zero, calculate from cart items
+            if (!transaction.amount || transaction.amount === 0) {
+              if (transaction.cart && transaction.cart.length > 0) {
+                let calculatedTotal = 0;
+
+                transaction.cart.forEach((item) => {
+                  if (item.activity) {
+                    const price =
+                      item.activity.price_discount || item.activity.price || 0;
+                    const quantity = item.quantity || 1;
+                    calculatedTotal += parseInt(price) * parseInt(quantity);
+                  }
+                });
+
+                if (calculatedTotal > 0) {
+                  transaction.amount = calculatedTotal;
+                }
+              }
+            }
+
+            return transaction;
+          }
+        );
+
+        setTransactions(processedTransactions);
       } catch (err) {
         console.error("Error fetching transactions:", err);
         setError("Failed to load transactions. Please try again later.");
@@ -68,11 +97,13 @@ export default function TransactionsPage() {
     }
   };
 
-  // Safely format number
+  // Safely format currency
   const formatCurrency = (value) => {
     if (value === undefined || value === null) return "Rp 0";
     try {
-      return `Rp ${value.toLocaleString("id-ID")}`;
+      // Make sure value is a number
+      const numValue = typeof value === "string" ? parseFloat(value) : value;
+      return `Rp ${numValue.toLocaleString("id-ID")}`;
     } catch (e) {
       console.error("Currency formatting error:", e, "Value:", value);
       return "Rp 0";

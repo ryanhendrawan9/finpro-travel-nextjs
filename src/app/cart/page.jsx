@@ -1,4 +1,3 @@
-// src/app/cart/page.jsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,9 +14,14 @@ import {
 } from "react-icons/fi";
 import { useCart } from "@/context/CartContext";
 import { useAuth } from "@/context/AuthContext";
-import { paymentMethodService, transactionService } from "@/lib/api";
+import {
+  paymentMethodService,
+  transactionService,
+  promoService,
+} from "@/lib/api";
 import CartItem from "@/components/cart/cart-item";
 import EmptyCart from "@/components/cart/empty-cart";
+import { toast } from "react-toastify";
 
 export default function CartPage() {
   const {
@@ -34,6 +38,7 @@ export default function CartPage() {
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutError, setCheckoutError] = useState(null);
+  const [validPromos, setValidPromos] = useState({});
   const router = useRouter();
 
   // Redirect to login if not authenticated
@@ -43,45 +48,105 @@ export default function CartPage() {
     }
   }, [isAuthenticated, cartLoading, router]);
 
-  // Fetch payment methods
+  // Fetch payment methods and promos
   useEffect(() => {
-    const fetchPaymentMethods = async () => {
+    const fetchData = async () => {
       try {
-        const response = await paymentMethodService.getAll();
-        const methods = response.data.data || [];
+        // Fetch payment methods
+        const paymentResponse = await paymentMethodService.getAll();
+        const methods = paymentResponse.data.data || [];
         setPaymentMethods(methods);
         if (methods.length > 0) {
           setSelectedPaymentMethod(methods[0].id);
         }
+
+        // Fetch available promos for validation
+        const promoResponse = await promoService.getAll();
+        const promos = promoResponse.data.data || [];
+
+        // Create a map of promo codes to discount values
+        const promoMap = {};
+        promos.forEach((promo) => {
+          if (promo.promo_code && promo.promo_discount_price) {
+            promoMap[promo.promo_code.toUpperCase()] = {
+              discount: promo.promo_discount_price,
+              minPurchase: promo.minimum_claim_price || 0,
+            };
+          }
+        });
+
+        // Add our test promo code
+        promoMap["TRAVEL10"] = {
+          discount: 0.1, // 10%
+          isPercentage: true,
+          minPurchase: 0,
+        };
+
+        setValidPromos(promoMap);
+        console.log("Available promos:", promoMap);
       } catch (error) {
-        console.error("Error fetching payment methods:", error);
+        console.error("Error fetching data:", error);
       }
     };
 
     if (isAuthenticated) {
-      fetchPaymentMethods();
+      fetchData();
     }
   }, [isAuthenticated]);
 
   // Get cart totals
   const { totalItems, subtotal } = getCartTotals();
 
+  // Make sure subtotal is valid
+  const validSubtotal = !isNaN(subtotal) ? subtotal : 0;
+
   // Calculate final amounts
-  const taxAmount = subtotal * 0.1; // 10% tax
-  const totalAmount = subtotal + taxAmount - promoDiscount;
+  const taxAmount = validSubtotal * 0.1; // 10% tax
+  const totalAmount = validSubtotal + taxAmount - promoDiscount;
 
   // Handle apply promo code
   const handleApplyPromoCode = (e) => {
     e.preventDefault();
 
-    // This would normally check the promo code against an API
-    // For demo purposes, apply a fixed discount if code is "TRAVEL10"
-    if (promoCode.toUpperCase() === "TRAVEL10") {
-      const discount = subtotal * 0.1; // 10% discount
+    if (!promoCode) {
+      toast.error("Please enter a promo code");
+      return;
+    }
+
+    console.log("Attempting to apply promo code:", promoCode);
+
+    const upperCasePromo = promoCode.toUpperCase();
+    const promoInfo = validPromos[upperCasePromo];
+
+    if (promoInfo) {
+      // Check if minimum purchase requirement is met
+      if (validSubtotal < promoInfo.minPurchase) {
+        toast.error(
+          `This promo requires a minimum purchase of Rp ${promoInfo.minPurchase.toLocaleString(
+            "id-ID"
+          )}`
+        );
+        setPromoDiscount(0);
+        return;
+      }
+
+      // Calculate discount
+      let discount = 0;
+      if (promoInfo.isPercentage) {
+        // Percentage-based discount
+        discount = validSubtotal * promoInfo.discount;
+      } else {
+        // Fixed amount discount
+        discount = promoInfo.discount;
+      }
+
       setPromoDiscount(discount);
+      toast.success(
+        `Promo code applied! Discount: Rp ${discount.toLocaleString("id-ID")}`
+      );
     } else {
       setPromoDiscount(0);
-      alert('Invalid promo code. Try "TRAVEL10" for 10% off.');
+      toast.error('Invalid promo code. Try "TRAVEL10" for 10% off.');
     }
   };
 
@@ -103,15 +168,46 @@ export default function CartPage() {
     try {
       // Safely extract cart IDs
       const cartIds = cartItems.map((item) => item.id).filter((id) => id);
+      console.log("Cart items for checkout:", cartItems);
+
+      // Calculate total manually for verification
+      let calculatedTotal = 0;
+      cartItems.forEach((item) => {
+        const price = parseInt(
+          item.activity?.price_discount || item.activity?.price || 0
+        );
+        const qty = parseInt(item.quantity) || 1;
+        const itemTotal = price * qty;
+        console.log(
+          `Checkout item: ${item.activity?.title}, Price: ${price}, Qty: ${qty}, Total: ${itemTotal}`
+        );
+        calculatedTotal += itemTotal;
+      });
+      console.log("Total calculated for checkout:", calculatedTotal);
 
       if (cartIds.length === 0) {
         throw new Error("No valid items in cart");
       }
 
-      const response = await transactionService.create({
+      // Create transaction data with calculated amount
+      const transactionData = {
         cartIds,
         paymentMethodId: selectedPaymentMethod,
-      });
+        amount: calculatedTotal, // Add explicit amount
+      };
+
+      // Add promo code if applicable
+      if (promoDiscount > 0 && promoCode) {
+        transactionData.promoCode = promoCode;
+        transactionData.promoDiscount = promoDiscount;
+        // Adjust amount after discount
+        transactionData.amount = calculatedTotal - promoDiscount;
+      }
+
+      console.log("Sending transaction data:", transactionData);
+
+      const response = await transactionService.create(transactionData);
+      console.log("Transaction created:", response.data);
 
       // Refresh cart items after successful transaction
       await fetchCartItems();
@@ -191,7 +287,7 @@ export default function CartPage() {
                     Subtotal ({totalItems} items)
                   </span>
                   <span className="font-medium text-gray-800">
-                    Rp {subtotal.toLocaleString("id-ID")}
+                    Rp {validSubtotal.toLocaleString("id-ID")}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -235,6 +331,9 @@ export default function CartPage() {
                     Apply
                   </button>
                 </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Try "TRAVEL10" for 10% off your order
+                </p>
               </form>
 
               {/* Payment methods */}

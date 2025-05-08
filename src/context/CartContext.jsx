@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "./AuthContext";
 import { cartService } from "@/lib/api";
 import { toast } from "react-toastify";
@@ -28,7 +29,8 @@ export function CartProvider({ children }) {
     setError(null);
     try {
       const response = await cartService.getAll();
-      setCartItems(response.data.data);
+      console.log("Fetched cart items:", response.data.data);
+      setCartItems(response.data.data || []);
     } catch (err) {
       const message =
         err.response?.data?.message || "Failed to fetch cart items.";
@@ -105,13 +107,40 @@ export function CartProvider({ children }) {
 
   // Calculate cart totals
   const getCartTotals = () => {
-    const totalItems = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-    const subtotal = cartItems.reduce((sum, item) => {
-      // Use discounted price if available, otherwise use regular price
-      const itemPrice = item.activity.price_discount || item.activity.price;
-      return sum + itemPrice * item.quantity;
+    // Calculate total items
+    const totalItems = cartItems.reduce((sum, item) => {
+      const qty = parseInt(item.quantity) || 1;
+      return sum + qty;
     }, 0);
 
+    // Calculate subtotal with proper type handling
+    const subtotal = cartItems.reduce((sum, item) => {
+      // Check if activity exists
+      if (!item.activity) return sum;
+
+      // Use price_discount if available, otherwise use regular price
+      // Ensure it's converted to a number
+      const itemPrice = parseInt(
+        item.activity.price_discount || item.activity.price || 0
+      );
+      const qty = parseInt(item.quantity) || 1;
+
+      // Log for debugging
+      console.log(
+        `Total calc - Item: ${
+          item.activity.title
+        }, Price: ${itemPrice}, Qty: ${qty}, Total: ${itemPrice * qty}`
+      );
+
+      return sum + itemPrice * qty;
+    }, 0);
+
+    console.log(
+      "Cart totals calculated - Items:",
+      totalItems,
+      "Subtotal:",
+      subtotal
+    );
     return { totalItems, subtotal };
   };
 
