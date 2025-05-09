@@ -37,6 +37,7 @@ export default function AdminDashboard() {
     pendingOrders: 0,
     activities: 0,
     promos: 0,
+    banners: 0,
   });
 
   // Recent transactions
@@ -57,13 +58,14 @@ export default function AdminDashboard() {
           setDataLoading(true);
 
           // Fetch data in parallel
-          const [users, transactions, categories, activities, promos] =
+          const [users, transactions, categories, activities, promos, banners] =
             await Promise.all([
               authService.getAllUsers(),
               transactionService.getAllTransactions(),
               categoryService.getAll(),
               activityService.getAll(),
               promoService.getAll(),
+              bannerService.getAll(),
             ]);
 
           console.log("Dashboard data loaded");
@@ -84,6 +86,7 @@ export default function AdminDashboard() {
             pendingOrders: pendingTransactions.length || 0,
             activities: activities.data.data?.length || 0,
             promos: promos.data.data?.length || 0,
+            banners: banners.data.data?.length || 0,
           });
 
           // Get recent transactions - latest 5
@@ -205,9 +208,63 @@ export default function AdminDashboard() {
                 <FiShoppingBag className="text-xl text-green-600" />
               </div>
               <div>
-                <h3 className="text-sm text-gray-500">Total Transactions</h3>
+                <h3 className="text-sm text-gray-500">Total Orders</h3>
                 <p className="text-2xl font-bold text-gray-900">
                   {stats.transactions}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ y: -5 }}
+            transition={{ duration: 0.2 }}
+            className="p-6 bg-white shadow-sm rounded-xl dashboard-stat-card"
+          >
+            <div className="flex items-center">
+              <div className="p-3 mr-4 bg-blue-100 rounded-lg">
+                <FiTag className="text-xl text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-sm text-gray-500">Pending Orders</h3>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.pendingOrders}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ y: -5 }}
+            transition={{ duration: 0.2 }}
+            className="p-6 bg-white shadow-sm rounded-xl dashboard-stat-card"
+          >
+            <div className="flex items-center">
+              <div className="p-3 mr-4 bg-orange-100 rounded-lg">
+                <FiImage className="text-xl text-orange-600" />
+              </div>
+              <div>
+                <h3 className="text-sm text-gray-500">Banners</h3>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.banners}
+                </p>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            whileHover={{ y: -5 }}
+            transition={{ duration: 0.2 }}
+            className="p-6 bg-white shadow-sm rounded-xl dashboard-stat-card"
+          >
+            <div className="flex items-center">
+              <div className="p-3 mr-4 bg-purple-100 rounded-lg">
+                <FiGrid className="text-xl text-purple-600" />
+              </div>
+              <div>
+                <h3 className="text-sm text-gray-500">Categories</h3>
+                <p className="text-2xl font-bold text-gray-900">
+                  {stats.categories}
                 </p>
               </div>
             </div>
@@ -237,13 +294,13 @@ export default function AdminDashboard() {
             className="p-6 bg-white shadow-sm rounded-xl dashboard-stat-card"
           >
             <div className="flex items-center">
-              <div className="p-3 mr-4 bg-blue-100 rounded-lg">
-                <FiTag className="text-xl text-blue-600" />
+              <div className="p-3 mr-4 bg-pink-100 rounded-lg">
+                <FiPercent className="text-xl text-pink-600" />
               </div>
               <div>
-                <h3 className="text-sm text-gray-500">Pending Orders</h3>
+                <h3 className="text-sm text-gray-500">Promos</h3>
                 <p className="text-2xl font-bold text-gray-900">
-                  {stats.pendingOrders}
+                  {stats.promos}
                 </p>
               </div>
             </div>
@@ -252,9 +309,7 @@ export default function AdminDashboard() {
 
         {/* Quick Actions */}
         <div className="p-6 mb-8 bg-white shadow-sm rounded-xl">
-          <h2 className="mb-4 text-xl font-bold text-gray-900">
-            Quick Actions
-          </h2>
+          <h2 className="mb-4 text-xl font-bold text-gray-900">Manage</h2>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
             <Link
               href="/admin/users"
@@ -263,7 +318,6 @@ export default function AdminDashboard() {
               <FiUsers className="mb-2 text-2xl text-gray-700" />
               <span className="text-sm text-gray-700">Users</span>
             </Link>
-
             <Link
               href="/admin/transactions"
               className="flex flex-col items-center justify-center p-4 transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
@@ -271,7 +325,13 @@ export default function AdminDashboard() {
               <FiShoppingBag className="mb-2 text-2xl text-gray-700" />
               <span className="text-sm text-gray-700">Orders</span>
             </Link>
-
+            <Link
+              href="/admin/banners"
+              className="flex flex-col items-center justify-center p-4 transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
+            >
+              <FiImage className="mb-2 text-2xl text-gray-700" />
+              <span className="text-sm text-gray-700">Banners</span>
+            </Link>
             <Link
               href="/admin/categories"
               className="flex flex-col items-center justify-center p-4 transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
@@ -279,7 +339,6 @@ export default function AdminDashboard() {
               <FiGrid className="mb-2 text-2xl text-gray-700" />
               <span className="text-sm text-gray-700">Categories</span>
             </Link>
-
             <Link
               href="/admin/activities"
               className="flex flex-col items-center justify-center p-4 transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
@@ -287,21 +346,12 @@ export default function AdminDashboard() {
               <FiActivity className="mb-2 text-2xl text-gray-700" />
               <span className="text-sm text-gray-700">Activities</span>
             </Link>
-
             <Link
               href="/admin/promos"
               className="flex flex-col items-center justify-center p-4 transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
             >
               <FiPercent className="mb-2 text-2xl text-gray-700" />
               <span className="text-sm text-gray-700">Promos</span>
-            </Link>
-
-            <Link
-              href="/admin/banners"
-              className="flex flex-col items-center justify-center p-4 transition-colors rounded-lg bg-gray-50 hover:bg-gray-100"
-            >
-              <FiImage className="mb-2 text-2xl text-gray-700" />
-              <span className="text-sm text-gray-700">Banners</span>
             </Link>
           </div>
         </div>

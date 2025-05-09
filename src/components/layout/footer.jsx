@@ -171,7 +171,7 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-start">
                 <FiMapPin className="flex-shrink-0 mt-1 mr-3 text-primary-400" />
-                <span>Jl. Sudirman No. 123, Jakarta Pusat, Indonesia</span>
+                <span>Jl. Sultan Adam, Banjarmasin, Indonesia</span>
               </li>
               <li className="flex items-center">
                 <FiPhone className="flex-shrink-0 mr-3 text-primary-400" />
@@ -179,7 +179,7 @@ export default function Footer() {
               </li>
               <li className="flex items-center">
                 <FiMail className="flex-shrink-0 mr-3 text-primary-400" />
-                <span>info@travelbright.com</span>
+                <span>healingkuy@gmail.com</span>
               </li>
             </ul>
           </div>
@@ -191,8 +191,7 @@ export default function Footer() {
         <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between md:flex-row">
             <p className="text-sm text-gray-500">
-              &copy; {new Date().getFullYear()} TravelBright. All rights
-              reserved.
+              &copy; {new Date().getFullYear()} HealingKuy. All rights reserved.
             </p>
             <div className="mt-4 md:mt-0">
               <div className="flex space-x-6 text-sm text-gray-500">

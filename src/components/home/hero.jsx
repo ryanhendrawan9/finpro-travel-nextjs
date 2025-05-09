@@ -52,7 +52,7 @@ export default function Hero() {
 
   return (
     <motion.div
-      className="relative h-[90vh] bg-cover bg-center overflow-hidden"
+      className="relative h-[100vh] bg-cover bg-center overflow-hidden"
       style={{
         backgroundImage:
           "url('https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80')",
@@ -65,34 +65,34 @@ export default function Hero() {
       <div className="absolute inset-0 bg-black bg-opacity-50"></div>
 
       {/* Hero content */}
-      <div className="relative h-full flex flex-col items-center justify-center text-white px-4 md:px-8 lg:px-16">
-        <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-center font-heading mb-6">
+      <div className="relative flex flex-col items-center justify-center h-full px-4 text-white md:px-8 lg:px-16">
+        <h1 className="mb-6 text-4xl font-bold text-center md:text-5xl lg:text-6xl font-heading">
           Discover Your Next Adventure
         </h1>
-        <p className="text-lg md:text-xl text-center max-w-3xl mb-12 text-gray-100">
+        <p className="max-w-3xl mb-12 text-lg text-center text-gray-100 md:text-xl">
           Explore extraordinary destinations, create unforgettable memories, and
           experience the world like never before!
         </p>
 
         {/* Search form */}
         <motion.div
-          className="w-full max-w-5xl bg-white rounded-2xl shadow-xl p-4 md:p-6"
+          className="w-full max-w-5xl p-4 bg-white shadow-xl rounded-2xl md:p-6"
           variants={formVariants}
         >
           <form
             onSubmit={handleSearch}
-            className="flex flex-col md:flex-row gap-4"
+            className="flex flex-col gap-4 md:flex-row"
           >
             <div className="flex-1">
-              <label className="text-gray-700 mb-1 block text-sm">
+              <label className="block mb-1 text-sm text-gray-700">
                 What are you looking for?
               </label>
               <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiSearch className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
                 <input
                   type="text"
                   placeholder="Activities, attractions, or experiences"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-700"
+                  className="w-full py-3 pl-10 pr-4 text-gray-700 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -100,13 +100,13 @@ export default function Hero() {
             </div>
 
             <div className="md:w-52">
-              <label className="text-gray-700 mb-1 block text-sm">Where</label>
+              <label className="block mb-1 text-sm text-gray-700">Where</label>
               <div className="relative">
-                <FiMapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiMapPin className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
                 <input
                   type="text"
                   placeholder="Destination"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-700"
+                  className="w-full py-3 pl-10 pr-4 text-gray-700 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
                 />
@@ -114,12 +114,12 @@ export default function Hero() {
             </div>
 
             <div className="md:w-48">
-              <label className="text-gray-700 mb-1 block text-sm">When</label>
+              <label className="block mb-1 text-sm text-gray-700">When</label>
               <div className="relative">
-                <FiCalendar className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiCalendar className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
                 <input
                   type="date"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-700"
+                  className="w-full py-3 pl-10 pr-4 text-gray-700 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
                 />
@@ -127,23 +127,23 @@ export default function Hero() {
             </div>
 
             <div className="md:w-36">
-              <label className="text-gray-700 mb-1 block text-sm">Guests</label>
+              <label className="block mb-1 text-sm text-gray-700">Guests</label>
               <div className="relative">
-                <FiUsers className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiUsers className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
                 <input
                   type="number"
                   min="1"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-700"
+                  className="w-full py-3 pl-10 pr-4 text-gray-700 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500"
                   value={guests}
                   onChange={(e) => setGuests(parseInt(e.target.value) || 1)}
                 />
               </div>
             </div>
 
-            <div className="md:self-end mt-auto">
+            <div className="mt-auto md:self-end">
               <button
                 type="submit"
-                className="w-full md:w-auto bg-primary-600 hover:bg-primary-700 text-white px-8 py-3 rounded-xl transition-colors duration-300 font-medium"
+                className="w-full px-8 py-3 font-medium text-white transition-colors duration-300 md:w-auto bg-primary-600 hover:bg-primary-700 rounded-xl"
               >
                 Search
               </button>

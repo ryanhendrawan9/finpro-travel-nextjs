@@ -66,7 +66,7 @@ export default function Navbar() {
                   isHomepage && !scrolled ? "text-white" : "text-primary-600"
                 }`}
               >
-                TravelBright
+                HealingKuy
               </span>
             </Link>
           </div>
@@ -204,18 +204,18 @@ export default function Navbar() {
                       {user.role === "admin" && (
                         <>
                           <Link
+                            href="/transaction"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            onClick={() => setIsProfileOpen(false)}
+                          >
+                            My Orders
+                          </Link>
+                          <Link
                             href="/admin/dashboard"
                             className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             onClick={() => setIsProfileOpen(false)}
                           >
                             Dashboard
-                          </Link>
-                          <Link
-                            href="/transaction"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                            onClick={() => setIsProfileOpen(false)}
-                          >
-                            Transactions
                           </Link>
                         </>
                       )}
@@ -386,18 +386,18 @@ export default function Navbar() {
                     {user.role === "admin" && (
                       <>
                         <Link
+                          href="/transaction"
+                          className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
+                          onClick={() => setIsMenuOpen(false)}
+                        >
+                          My Orders
+                        </Link>
+                        <Link
                           href="/admin/dashboard"
                           className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
                           onClick={() => setIsMenuOpen(false)}
                         >
                           Dashboard
-                        </Link>
-                        <Link
-                          href="/transaction"
-                          className="block px-3 py-2 font-medium text-gray-700 rounded-md hover:bg-primary-50 hover:text-primary-600"
-                          onClick={() => setIsMenuOpen(false)}
-                        >
-                          Transactions
                         </Link>
                       </>
                     )}
