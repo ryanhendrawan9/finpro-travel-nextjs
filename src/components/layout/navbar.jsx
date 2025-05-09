@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -61,13 +62,16 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center flex-shrink-0">
             <Link href="/" className="flex items-center">
-              <span
-                className={`font-bold text-2xl ${
-                  isHomepage && !scrolled ? "text-white" : "text-primary-600"
+              <Image
+                src="/images/logo.png"
+                alt="HealingKuy Logo"
+                width={100}
+                height={40}
+                className={`${
+                  isHomepage && !scrolled ? "brightness-0 invert" : ""
                 }`}
-              >
-                HealingKuy
-              </span>
+                priority
+              />
             </Link>
           </div>
 

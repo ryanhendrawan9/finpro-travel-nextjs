@@ -271,56 +271,168 @@ export const promoService = {
 
 // Cart services
 export const cartService = {
-  getAll: () =>
-    api.get("/api/v1/carts").then((response) => {
-      if (typeof window !== "undefined") {
-        // Log cart data for debugging
+  getAll: async () => {
+    try {
+      const response = await api.get("/api/v1/carts");
+
+      // Handle the response - even if empty array
+      if (response.data && Array.isArray(response.data.data)) {
+        const cartItems = response.data.data;
         console.log(
-          "Cart totals calculated - Items:",
-          response.data?.data?.length || 0,
+          "Cart data fetched - Items:",
+          cartItems.length,
           "Subtotal:",
-          response.data?.data?.reduce(
-            (total, item) => total + (item?.price || 0) * (item?.quantity || 1),
-            0
-          ) || 0
+          calculateCartTotal(cartItems)
         );
+        return response;
+      } else {
+        console.warn(
+          "API returned invalid cart data structure:",
+          response.data
+        );
+        return { data: { data: [], message: "No cart data found" } };
       }
-      return response;
-    }),
+    } catch (error) {
+      console.warn("Error fetching cart:", error.message);
+      // Return empty cart to prevent errors
+      return { data: { data: [], message: "Failed to fetch cart items" } };
+    }
+  },
   addToCart: (data) => api.post("/api/v1/add-cart", data),
   updateCart: (id, data) => api.post(`/api/v1/update-cart/${id}`, data),
   deleteCart: (id) => api.delete(`/api/v1/delete-cart/${id}`),
 };
 
+function calculateCartTotal(cartItems) {
+  if (!Array.isArray(cartItems) || cartItems.length === 0) return 0;
+
+  return cartItems.reduce((total, item) => {
+    if (!item || !item.activity) return total;
+
+    const price = parseFloat(
+      item.activity.price_discount || item.activity.price || 0
+    );
+    const qty = parseInt(item.quantity) || 1;
+    return isNaN(price) ? total : total + price * qty;
+  }, 0);
+}
+
 // Transaction services
 export const transactionService = {
   getById: (id) => {
     console.log(`Getting transaction with ID: ${id}`);
-    return api.get(`/api/v1/transaction/${id}`).then((response) => {
-      console.log("Transaction data received:", response.data);
-      return response;
-    });
+    return api
+      .get(`/api/v1/transaction/${id}`)
+      .then((response) => {
+        console.log("Transaction data received:", response.data);
+        return response;
+      })
+      .catch((error) => {
+        console.warn(
+          `Failed to fetch transaction with ID ${id}:`,
+          error.message
+        );
+        return createFallbackResponse(
+          `Failed to fetch transaction with ID ${id}`
+        );
+      });
   },
+
   getMyTransactions: () => {
     console.log("Fetching my transactions");
-    return api.get("/api/v1/my-transactions").then((response) => {
-      console.log("My transactions data received:", response.data);
-      return response;
+    return api
+      .get("/api/v1/my-transactions")
+      .then((response) => {
+        console.log("My transactions data received:", response.data);
+        return response;
+      })
+      .catch((error) => {
+        console.warn("Failed to fetch my transactions:", error.message);
+        return createFallbackResponse("Failed to fetch transaction history");
+      });
+  },
+
+  getAllTransactions: () => {
+    return api.get("/api/v1/all-transactions").catch((error) => {
+      console.warn("Failed to fetch all transactions:", error.message);
+      return createFallbackResponse("Failed to fetch all transactions");
     });
   },
-  getAllTransactions: () => api.get("/api/v1/all-transactions"),
-  create: (data) => {
+
+  create: async (data) => {
     console.log("Creating transaction with data:", data);
-    return api.post("/api/v1/create-transaction", data).then((response) => {
+    try {
+      // Validate data before sending to API
+      if (
+        !data.cartIds ||
+        !Array.isArray(data.cartIds) ||
+        data.cartIds.length === 0
+      ) {
+        throw new Error("No cart items selected for checkout");
+      }
+
+      if (!data.paymentMethodId) {
+        throw new Error("No payment method selected");
+      }
+
+      const response = await api.post("/api/v1/create-transaction", data);
       console.log("Transaction creation response:", response.data);
       return response;
+    } catch (error) {
+      console.warn("Transaction creation error:", error.message);
+      throw error; // Re-throw to let the component handle it
+    }
+  },
+
+  cancel: (id) => {
+    return api.post(`/api/v1/cancel-transaction/${id}`).catch((error) => {
+      console.warn(`Failed to cancel transaction ${id}:`, error.message);
+      throw error; // Re-throw to let component handle it
     });
   },
-  cancel: (id) => api.post(`/api/v1/cancel-transaction/${id}`),
-  updateProofPayment: (id, data) =>
-    api.post(`/api/v1/update-transaction-proof-payment/${id}`, data),
-  updateStatus: (id, data) =>
-    api.post(`/api/v1/update-transaction-status/${id}`, data),
+
+  updateProofPayment: (id, data) => {
+    // Validate proof payment URL before sending
+    if (!data.proofPaymentUrl || !data.proofPaymentUrl.trim()) {
+      return Promise.reject(new Error("Payment proof URL is required"));
+    }
+
+    return api
+      .post(`/api/v1/update-transaction-proof-payment/${id}`, data)
+      .catch((error) => {
+        console.warn(
+          `Failed to update proof payment for transaction ${id}:`,
+          error.message
+        );
+        throw error; // Re-throw to let component handle it
+      });
+  },
+
+  updateStatus: (id, data) => {
+    // Validate status value before sending
+    if (
+      !data.status ||
+      ![
+        "success",
+        "failed",
+        "waiting-for-confirmation",
+        "waiting-for-payment",
+        "canceled",
+      ].includes(data.status)
+    ) {
+      return Promise.reject(new Error("Invalid transaction status"));
+    }
+
+    return api
+      .post(`/api/v1/update-transaction-status/${id}`, data)
+      .catch((error) => {
+        console.warn(
+          `Failed to update status for transaction ${id}:`,
+          error.message
+        );
+        throw error; // Re-throw to let component handle it
+      });
+  },
 };
 
 // Payment method services

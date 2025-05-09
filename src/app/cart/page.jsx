@@ -54,7 +54,7 @@ export default function CartPage() {
       try {
         // Fetch payment methods
         const paymentResponse = await paymentMethodService.getAll();
-        const methods = paymentResponse.data.data || [];
+        const methods = paymentResponse?.data?.data || [];
         setPaymentMethods(methods);
         if (methods.length > 0) {
           setSelectedPaymentMethod(methods[0].id);
@@ -62,7 +62,7 @@ export default function CartPage() {
 
         // Fetch available promos for validation
         const promoResponse = await promoService.getAll();
-        const promos = promoResponse.data.data || [];
+        const promos = promoResponse?.data?.data || [];
 
         // Create a map of promo codes to discount values
         const promoMap = {};
@@ -86,6 +86,7 @@ export default function CartPage() {
         console.log("Available promos:", promoMap);
       } catch (error) {
         console.error("Error fetching data:", error);
+        toast.error("Failed to load payment options. Please refresh the page.");
       }
     };
 
@@ -166,42 +167,23 @@ export default function CartPage() {
     setCheckoutError(null);
 
     try {
-      // Safely extract cart IDs
-      const cartIds = cartItems.map((item) => item.id).filter((id) => id);
-      console.log("Cart items for checkout:", cartItems);
-
-      // Calculate total manually for verification
-      let calculatedTotal = 0;
-      cartItems.forEach((item) => {
-        const price = parseInt(
-          item.activity?.price_discount || item.activity?.price || 0
-        );
-        const qty = parseInt(item.quantity) || 1;
-        const itemTotal = price * qty;
-        console.log(
-          `Checkout item: ${item.activity?.title}, Price: ${price}, Qty: ${qty}, Total: ${itemTotal}`
-        );
-        calculatedTotal += itemTotal;
-      });
-      console.log("Total calculated for checkout:", calculatedTotal);
+      // Extract cart IDs safely
+      const cartIds = cartItems.map((item) => item?.id).filter(Boolean);
 
       if (cartIds.length === 0) {
         throw new Error("No valid items in cart");
       }
 
-      // Create transaction data with calculated amount
+      // Create transaction data
       const transactionData = {
         cartIds,
         paymentMethodId: selectedPaymentMethod,
-        amount: calculatedTotal, // Add explicit amount
       };
 
-      // Add promo code if applicable
+      // Add promo if applicable
       if (promoDiscount > 0 && promoCode) {
         transactionData.promoCode = promoCode;
         transactionData.promoDiscount = promoDiscount;
-        // Adjust amount after discount
-        transactionData.amount = calculatedTotal - promoDiscount;
       }
 
       console.log("Sending transaction data:", transactionData);
@@ -209,14 +191,14 @@ export default function CartPage() {
       const response = await transactionService.create(transactionData);
       console.log("Transaction created:", response.data);
 
-      // Refresh cart items after successful transaction
+      // Refresh cart
       await fetchCartItems();
 
-      // Redirect to transaction detail page if response contains transaction ID
+      // Redirect to transaction detail
       if (response.data?.data?.id) {
         router.push(`/transaction/${response.data.data.id}`);
       } else {
-        router.push("/transaction"); // Fallback to transactions list
+        router.push("/transaction");
       }
     } catch (error) {
       console.error("Checkout error:", error);

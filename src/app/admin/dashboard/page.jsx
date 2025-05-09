@@ -24,6 +24,7 @@ import {
   transactionService,
   authService,
 } from "@/lib/api";
+import { normalizeStatus } from "@/lib/transaction-helpers"; // Import helper
 
 export default function AdminDashboard() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -70,13 +71,15 @@ export default function AdminDashboard() {
 
           console.log("Dashboard data loaded");
 
-          // Process data
+          // Process data with normalized statuses
           const pendingTransactions =
-            transactions.data.data?.filter(
-              (t) =>
-                t.status === "waiting-for-payment" ||
-                t.status === "waiting-for-confirmation"
-            ) || [];
+            transactions.data.data?.filter((t) => {
+              const status = normalizeStatus(t.status);
+              return (
+                status === "waiting-for-payment" ||
+                status === "waiting-for-confirmation"
+              );
+            }) || [];
 
           // Update stats
           setStats({
@@ -94,11 +97,15 @@ export default function AdminDashboard() {
             .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
             .slice(0, 5);
 
-          // Process transactions to ensure they have valid amounts
+          // Process transactions to ensure they have valid amounts and normalized status
           const processedTransactions = sortedTransactions.map(
             (transaction) => {
+              // Normalize status
+              transaction.status = normalizeStatus(transaction.status);
+
               // If amount is missing or zero, calculate from cart items
               if (!transaction.amount || transaction.amount === 0) {
+                // Try cart field
                 if (transaction.cart && transaction.cart.length > 0) {
                   let calculatedTotal = 0;
 
@@ -116,6 +123,28 @@ export default function AdminDashboard() {
                   if (calculatedTotal > 0) {
                     transaction.amount = calculatedTotal;
                   }
+                }
+                // Try transaction_items as alternative
+                else if (
+                  transaction.transaction_items &&
+                  transaction.transaction_items.length > 0
+                ) {
+                  let calculatedTotal = 0;
+
+                  transaction.transaction_items.forEach((item) => {
+                    const price = item.price_discount || item.price || 0;
+                    const quantity = item.quantity || 1;
+                    calculatedTotal += parseInt(price) * parseInt(quantity);
+                  });
+
+                  if (calculatedTotal > 0) {
+                    transaction.amount = calculatedTotal;
+                  }
+                }
+
+                // Check totalAmount field
+                if (transaction.totalAmount && transaction.totalAmount > 0) {
+                  transaction.amount = transaction.totalAmount;
                 }
               }
 
@@ -165,9 +194,31 @@ export default function AdminDashboard() {
   // Format currency
   const formatCurrency = (amount) => {
     try {
-      return `Rp ${parseInt(amount).toLocaleString("id-ID")}`;
+      // Ensure amount is a number
+      const numAmount =
+        typeof amount === "string" ? parseFloat(amount) : amount;
+      return `Rp ${(numAmount || 0).toLocaleString("id-ID")}`;
     } catch (e) {
       return "Rp 0";
+    }
+  };
+
+  // Get status display class
+  const getStatusClass = (status) => {
+    // Normalize the status first
+    const normalizedStatus = normalizeStatus(status);
+
+    switch (normalizedStatus) {
+      case "success":
+        return "bg-green-100 text-green-800";
+      case "waiting-for-payment":
+      case "waiting-for-confirmation":
+        return "bg-yellow-100 text-yellow-800";
+      case "failed":
+      case "canceled":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
@@ -412,26 +463,15 @@ export default function AdminDashboard() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {recentTransactions.map((transaction) => {
-                  // Determine status style
-                  let statusClass = "bg-gray-100 text-gray-800";
-                  if (transaction.status === "success") {
-                    statusClass = "bg-green-100 text-green-800";
-                  } else if (
-                    transaction.status === "waiting-for-payment" ||
-                    transaction.status === "waiting-for-confirmation"
-                  ) {
-                    statusClass = "bg-yellow-100 text-yellow-800";
-                  } else if (
-                    transaction.status === "failed" ||
-                    transaction.status === "canceled"
-                  ) {
-                    statusClass = "bg-red-100 text-red-800";
-                  }
+                  // Get normalized status and style
+                  const status = normalizeStatus(transaction.status);
+                  const statusClass = getStatusClass(status);
+                  const shortId = transaction.id?.substring(0, 8) || "unknown";
 
                   return (
                     <tr key={transaction.id}>
                       <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                        #{transaction.id.substring(0, 8)}
+                        #{shortId}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                         {transaction.user?.name ||
@@ -439,13 +479,15 @@ export default function AdminDashboard() {
                           "Unknown"}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                        {formatCurrency(transaction.amount)}
+                        {formatCurrency(
+                          transaction.amount || transaction.totalAmount
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
                           className={`inline-flex px-2 text-xs font-semibold leading-5 rounded-full ${statusClass}`}
                         >
-                          {transaction.status}
+                          {status}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">

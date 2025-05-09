@@ -19,6 +19,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { transactionService } from "@/lib/api";
 import { toast } from "react-toastify";
+import { normalizeStatus } from "@/lib/transaction-helpers"; // Import helper
 
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState([]);
@@ -50,6 +51,9 @@ export default function TransactionsPage() {
         // Process transactions to ensure they have valid amounts
         const processedTransactions = (response.data.data || []).map(
           (transaction) => {
+            // Normalize status to handle inconsistencies
+            transaction.status = normalizeStatus(transaction.status);
+
             // If amount is missing or zero, calculate from cart items
             if (!transaction.amount || transaction.amount === 0) {
               if (transaction.cart && transaction.cart.length > 0) {
@@ -67,6 +71,11 @@ export default function TransactionsPage() {
                 if (calculatedTotal > 0) {
                   transaction.amount = calculatedTotal;
                 }
+              }
+
+              // Also check if we have totalAmount field (API inconsistency)
+              if (transaction.totalAmount && transaction.totalAmount > 0) {
+                transaction.amount = transaction.totalAmount;
               }
             }
 
@@ -91,8 +100,11 @@ export default function TransactionsPage() {
   // Filter transactions
   const filteredTransactions = transactions.filter((transaction) => {
     // Status filter
-    if (statusFilter !== "all" && transaction.status !== statusFilter) {
-      return false;
+    if (statusFilter !== "all") {
+      const normalizedStatus = normalizeStatus(transaction.status);
+      if (normalizedStatus !== statusFilter) {
+        return false;
+      }
     }
 
     // Search query
@@ -151,52 +163,55 @@ export default function TransactionsPage() {
         description: "Status unknown",
       };
 
-    switch (status) {
-      case "waiting-for-payment":
-        return {
-          color: "text-yellow-600 bg-yellow-100",
-          icon: <FiClock className="mr-2" />,
-          text: "Waiting for Payment",
-          description:
-            "Please complete your payment and upload proof of payment",
-        };
-      case "waiting-for-confirmation":
-        return {
-          color: "text-blue-600 bg-blue-100",
-          icon: <FiInfo className="mr-2" />,
-          text: "Waiting for Confirmation",
-          description:
-            "We're reviewing your payment. This may take 1-2 business days.",
-        };
-      case "success":
-        return {
-          color: "text-green-600 bg-green-100",
-          icon: <FiCheckCircle className="mr-2" />,
-          text: "Success",
-          description: "Your transaction has been completed successfully",
-        };
-      case "failed":
-        return {
-          color: "text-red-600 bg-red-100",
-          icon: <FiXCircle className="mr-2" />,
-          text: "Failed",
-          description:
-            "Your payment was not approved. Please contact support for assistance.",
-        };
-      case "canceled":
-        return {
-          color: "text-gray-600 bg-gray-100",
-          icon: <FiXCircle className="mr-2" />,
-          text: "Canceled",
-          description: "This transaction has been canceled",
-        };
-      default:
-        return {
-          color: "text-gray-600 bg-gray-100",
-          icon: <FiInfo className="mr-2" />,
-          text: status,
-          description: "Transaction status: " + status,
-        };
+    // Convert to lowercase to handle case inconsistencies
+    const statusLower = normalizeStatus(status).toLowerCase();
+
+    // Map API status values to your application's display values
+    if (statusLower === "waiting-for-payment" || statusLower === "pending") {
+      return {
+        color: "text-yellow-600 bg-yellow-100",
+        icon: <FiClock className="mr-2" />,
+        text: "Waiting for Payment",
+        description: "Please complete your payment and upload proof of payment",
+      };
+    } else if (statusLower === "waiting-for-confirmation") {
+      return {
+        color: "text-blue-600 bg-blue-100",
+        icon: <FiInfo className="mr-2" />,
+        text: "Waiting for Confirmation",
+        description:
+          "We're reviewing your payment. This may take 1-2 business days.",
+      };
+    } else if (statusLower === "success" || statusLower === "completed") {
+      return {
+        color: "text-green-600 bg-green-100",
+        icon: <FiCheckCircle className="mr-2" />,
+        text: "Success",
+        description: "Your transaction has been completed successfully",
+      };
+    } else if (statusLower === "failed") {
+      return {
+        color: "text-red-600 bg-red-100",
+        icon: <FiXCircle className="mr-2" />,
+        text: "Failed",
+        description:
+          "Your payment was not approved. Please contact support for assistance.",
+      };
+    } else if (statusLower === "canceled" || statusLower === "cancelled") {
+      return {
+        color: "text-gray-600 bg-gray-100",
+        icon: <FiXCircle className="mr-2" />,
+        text: "Canceled",
+        description: "This transaction has been canceled",
+      };
+    } else {
+      // Default case for any other status
+      return {
+        color: "text-gray-600 bg-gray-100",
+        icon: <FiInfo className="mr-2" />,
+        text: status,
+        description: "Transaction status: " + status,
+      };
     }
   };
 
@@ -343,8 +358,10 @@ export default function TransactionsPage() {
               const statusDetails = getStatusDetails(transaction?.status);
               const id = transaction?.id || "unknown";
               const shortId = id.substring(0, 8);
-              const amount = transaction?.amount || 0;
-              const activities = transaction?.cart || [];
+              const amount =
+                transaction?.amount || transaction?.totalAmount || 0;
+              const activities =
+                transaction?.cart || transaction?.transaction_items || [];
 
               return (
                 <motion.div
@@ -401,33 +418,39 @@ export default function TransactionsPage() {
                           Items
                         </h4>
                         <ul className="space-y-2">
-                          {activities.slice(0, 2).map((item, index) => (
-                            <li key={index} className="flex items-center">
-                              <div className="w-10 h-10 mr-3 overflow-hidden rounded-lg">
-                                <img
-                                  src={
-                                    item.activity?.imageUrls?.[0] ||
-                                    "/images/placeholders/activity-placeholder.jpg"
-                                  }
-                                  alt={item.activity?.title || "Activity"}
-                                  className="object-cover w-full h-full"
-                                  onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src =
-                                      "/images/placeholders/activity-placeholder.jpg";
-                                  }}
-                                />
-                              </div>
-                              <div className="flex-grow">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {item.activity?.title || "Unknown activity"}
+                          {activities.slice(0, 2).map((item, index) => {
+                            // Handle different data structures
+                            const activityItem = item.activity || item;
+                            const imageUrl = activityItem.imageUrls
+                              ? activityItem.imageUrls[0]
+                              : activityItem.imageUrl ||
+                                "/images/placeholders/activity-placeholder.jpg";
+
+                            return (
+                              <li key={index} className="flex items-center">
+                                <div className="w-10 h-10 mr-3 overflow-hidden rounded-lg">
+                                  <img
+                                    src={imageUrl}
+                                    alt={activityItem.title || "Activity"}
+                                    className="object-cover w-full h-full"
+                                    onError={(e) => {
+                                      e.target.onerror = null;
+                                      e.target.src =
+                                        "/images/placeholders/activity-placeholder.jpg";
+                                    }}
+                                  />
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  Qty: {item.quantity || 1}
+                                <div className="flex-grow">
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {activityItem.title || "Unknown activity"}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Qty: {item.quantity || 1}
+                                  </div>
                                 </div>
-                              </div>
-                            </li>
-                          ))}
+                              </li>
+                            );
+                          })}
                           {activities.length > 2 && (
                             <li className="text-sm text-gray-500">
                               + {activities.length - 2} more items
@@ -444,15 +467,30 @@ export default function TransactionsPage() {
                           Payment Method
                         </h4>
                         <div className="flex items-center">
-                          {transaction?.paymentMethod?.imageUrl && (
+                          {(transaction?.paymentMethod?.imageUrl ||
+                            transaction?.payment_method?.imageUrl) && (
                             <img
-                              src={transaction.paymentMethod.imageUrl}
-                              alt={transaction.paymentMethod.name}
+                              src={
+                                transaction?.paymentMethod?.imageUrl ||
+                                transaction?.payment_method?.imageUrl
+                              }
+                              alt={
+                                transaction?.paymentMethod?.name ||
+                                transaction?.payment_method?.name ||
+                                "Payment Method"
+                              }
                               className="h-6 mr-2"
+                              onError={(e) => {
+                                e.target.onerror = null;
+                                e.target.src =
+                                  "/images/placeholders/payment-placeholder.jpg";
+                              }}
                             />
                           )}
                           <span className="font-medium text-gray-900">
-                            {transaction?.paymentMethod?.name || "N/A"}
+                            {transaction?.paymentMethod?.name ||
+                              transaction?.payment_method?.name ||
+                              "N/A"}
                           </span>
                         </div>
                       </div>
@@ -461,7 +499,8 @@ export default function TransactionsPage() {
                     <div className="flex flex-wrap items-center justify-between gap-3 mt-6">
                       {/* Action buttons based on status */}
                       <div className="flex flex-wrap gap-3">
-                        {transaction.status === "waiting-for-payment" && (
+                        {(transaction.status === "waiting-for-payment" ||
+                          transaction.status === "pending") && (
                           <>
                             <button
                               onClick={() => openUploadModal(transaction.id)}

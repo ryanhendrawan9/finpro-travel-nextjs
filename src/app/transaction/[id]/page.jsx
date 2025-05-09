@@ -47,39 +47,82 @@ export default function TransactionDetailPage({ params }) {
         const response = await transactionService.getById(id);
         console.log("Transaction data received:", response.data.data);
 
-        const transactionData = response.data.data;
+        let transactionData = response.data.data;
+
+        // Handle different response structures
+        // Compatibility with both response formats
+        const cartItems =
+          transactionData.transaction_items || transactionData.cart || [];
+
+        // Normalize transaction items structure
+        const normalizedItems = cartItems.map((item) => {
+          // If item already has an activity property, use it
+          if (item.activity) return item;
+
+          // Otherwise, construct an activity object from the item itself
+          return {
+            id: item.id,
+            quantity: item.quantity || 1,
+            activity: {
+              id: item.id,
+              title: item.title || "Unnamed Activity",
+              price: item.price || 0,
+              price_discount: item.price_discount || null,
+              imageUrls: Array.isArray(item.imageUrls)
+                ? item.imageUrls
+                : item.imageUrl
+                ? [item.imageUrl]
+                : [],
+              description: item.description || "",
+              city: item.city || "",
+              province: item.province || "",
+            },
+          };
+        });
+
+        // Update the transaction object with the normalized items
+        transactionData = {
+          ...transactionData,
+          cart: normalizedItems,
+          // Ensure other essential fields exist
+          status: transactionData.status || "pending",
+          proofPaymentUrl: transactionData.proofPaymentUrl || null,
+          amount: transactionData.amount || transactionData.totalAmount || 0,
+          paymentMethod:
+            transactionData.payment_method ||
+            transactionData.paymentMethod ||
+            {},
+        };
 
         // Calculate amount from items if needed
         if (!transactionData.amount || transactionData.amount === 0) {
-          console.log(
-            "Transaction amount missing or zero, calculating from cart items"
-          );
+          let calculatedTotal = 0;
 
-          if (transactionData.cart && transactionData.cart.length > 0) {
-            let calculatedTotal = 0;
-
-            transactionData.cart.forEach((item) => {
-              if (item.activity) {
-                const price =
-                  item.activity.price_discount || item.activity.price || 0;
-                const quantity = item.quantity || 1;
-                const itemTotal = parseInt(price) * parseInt(quantity);
-                calculatedTotal += itemTotal;
-                console.log(
-                  `Item: ${item.activity.title}, Price: ${price}, Qty: ${quantity}, Total: ${itemTotal}`
-                );
-              }
-            });
-
-            console.log("Total calculated from items:", calculatedTotal);
-
-            // Set the calculated amount for display
-            setCalculatedAmount(calculatedTotal);
-
-            // Update transaction data with calculated amount
-            if (calculatedTotal > 0) {
-              transactionData.amount = calculatedTotal;
+          normalizedItems.forEach((item) => {
+            let price = 0;
+            if (item.activity) {
+              price = item.activity.price_discount || item.activity.price || 0;
+            } else {
+              price = item.price_discount || item.price || 0;
             }
+
+            // Convert price to number if it's a string
+            const numericPrice =
+              typeof price === "string" ? parseFloat(price) : price;
+
+            // Get quantity (default to 1)
+            const quantity = parseInt(item.quantity) || 1;
+
+            // Add to total
+            calculatedTotal += numericPrice * quantity;
+          });
+
+          console.log("Calculated amount from items:", calculatedTotal);
+          setCalculatedAmount(calculatedTotal);
+
+          // Only update if we calculated something positive
+          if (calculatedTotal > 0) {
+            transactionData.amount = calculatedTotal;
           }
         }
 
@@ -203,8 +246,12 @@ export default function TransactionDetailPage({ params }) {
       };
     }
 
-    switch (status) {
+    // Convert to lowercase to handle case inconsistencies
+    const statusLower = status.toLowerCase();
+
+    switch (statusLower) {
       case "waiting-for-payment":
+      case "pending":
         return {
           color: "text-yellow-600 bg-yellow-100",
           icon: <FiClock className="mr-2" />,
@@ -221,6 +268,7 @@ export default function TransactionDetailPage({ params }) {
             "We're reviewing your payment. This may take 1-2 business days.",
         };
       case "success":
+      case "completed":
         return {
           color: "text-green-600 bg-green-100",
           icon: <FiCheckCircle className="mr-2" />,
@@ -278,24 +326,22 @@ export default function TransactionDetailPage({ params }) {
     );
   }
 
+  // Destructure with fallbacks for all fields
   const {
-    id: transactionId,
-    amount,
-    status,
+    id: transactionId = id,
+    amount = calculatedAmount,
+    status = "pending",
     createdAt,
     updatedAt,
-    proofPaymentUrl: currentProofUrl,
-    paymentMethod,
-    cart,
-    user: transactionUser,
-    promoDiscount,
-    promoCode,
+    proofPaymentUrl: currentProofUrl = null,
+    paymentMethod = {},
+    cart = [],
+    user: transactionUser = {},
+    promoDiscount = 0,
+    promoCode = null,
   } = transaction;
 
   const statusInfo = getStatusInfo(status);
-
-  // Calculate display amount (use either transaction amount or calculated amount)
-  const displayAmount = amount || calculatedAmount;
 
   // Check if current user is admin
   const isAdmin = user?.role === "admin";
@@ -363,7 +409,7 @@ export default function TransactionDetailPage({ params }) {
                   <div className="flex items-start">
                     <div className="w-1/3 text-sm text-gray-500">Amount</div>
                     <div className="w-2/3 text-xl font-bold text-primary-600">
-                      {formatCurrency(displayAmount)}
+                      {formatCurrency(amount)}
                     </div>
                   </div>
 
@@ -468,7 +514,7 @@ export default function TransactionDetailPage({ params }) {
             </div>
 
             {/* Payment proof upload - Only show if status is waiting for payment */}
-            {status === "waiting-for-payment" && (
+            {(status === "waiting-for-payment" || status === "pending") && (
               <div className="p-6 mt-6 border-t border-gray-200 rounded-lg bg-gray-50">
                 <h3 className="flex items-center mb-4 text-lg font-bold text-gray-900">
                   <FiUpload className="mr-2 text-primary-600" />
@@ -498,6 +544,11 @@ export default function TransactionDetailPage({ params }) {
                           src={paymentMethod.imageUrl}
                           alt={paymentMethod.name}
                           className="h-8 mr-3"
+                          onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.src =
+                              "/images/placeholders/payment-placeholder.jpg";
+                          }}
                         />
                       )}
                       <h4 className="font-medium text-gray-800">
@@ -506,16 +557,21 @@ export default function TransactionDetailPage({ params }) {
                     </div>
                     <p className="text-sm text-gray-600">
                       Account Number:{" "}
-                      <span className="font-medium">1234-5678-9012-3456</span>
+                      <span className="font-medium">
+                        {paymentMethod.virtual_account_number ||
+                          "1234-5678-9012-3456"}
+                      </span>
                     </p>
                     <p className="text-sm text-gray-600">
                       Account Name:{" "}
-                      <span className="font-medium">TravelBright</span>
+                      <span className="font-medium">
+                        {paymentMethod.virtual_account_name || "TravelBright"}
+                      </span>
                     </p>
                     <p className="mt-2 text-sm text-gray-600">
                       Amount to Pay:{" "}
                       <span className="font-medium text-primary-600">
-                        {formatCurrency(displayAmount)}
+                        {formatCurrency(amount)}
                       </span>
                     </p>
                   </div>
@@ -603,11 +659,12 @@ export default function TransactionDetailPage({ params }) {
               <div className="space-y-4">
                 {cart &&
                   cart.map((item, index) => {
+                    // Get activity data from the item or the item itself
+                    const activityData = item.activity || item;
+
                     // Safely calculate price
                     const itemPrice =
-                      item.activity?.price_discount ||
-                      item.activity?.price ||
-                      0;
+                      activityData.price_discount || activityData.price || 0;
                     const quantity = item.quantity || 1;
                     const totalPrice = itemPrice * quantity;
 
@@ -619,10 +676,12 @@ export default function TransactionDetailPage({ params }) {
                         <div className="w-full h-32 mb-3 overflow-hidden rounded-lg md:w-16 md:h-16 md:mb-0 md:mr-4">
                           <img
                             src={
-                              item.activity?.imageUrls?.[0] ||
+                              (Array.isArray(activityData.imageUrls)
+                                ? activityData.imageUrls[0]
+                                : activityData.imageUrl) ||
                               "/images/placeholders/activity-placeholder.jpg"
                             }
-                            alt={item.activity?.title || "Activity"}
+                            alt={activityData.title || "Activity"}
                             className="object-cover w-full h-full"
                             onError={(e) => {
                               e.target.onerror = null;
@@ -634,13 +693,11 @@ export default function TransactionDetailPage({ params }) {
 
                         <div className="flex-grow">
                           <h4 className="font-medium text-gray-900">
-                            {item.activity?.title || "Unnamed Activity"}
+                            {activityData.title || "Unnamed Activity"}
                           </h4>
                           <p className="text-sm text-gray-600">
-                            {item.activity?.city
-                              ? `${item.activity.city}, `
-                              : ""}
-                            {item.activity?.province || ""}
+                            {activityData.city ? `${activityData.city}, ` : ""}
+                            {activityData.province || ""}
                           </p>
                         </div>
 
@@ -660,7 +717,7 @@ export default function TransactionDetailPage({ params }) {
 
             {/* Actions */}
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-              {status === "waiting-for-payment" && (
+              {(status === "waiting-for-payment" || status === "pending") && (
                 <div className="flex justify-between">
                   <button
                     className="px-4 py-2 text-gray-700 transition-colors border border-gray-300 rounded-lg hover:bg-gray-100"

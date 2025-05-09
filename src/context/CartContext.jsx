@@ -10,7 +10,7 @@ const CartContext = createContext();
 
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start with loading true
   const [error, setError] = useState(null);
   const { isAuthenticated } = useAuth();
 
@@ -20,6 +20,7 @@ export function CartProvider({ children }) {
       fetchCartItems();
     } else {
       setCartItems([]);
+      setLoading(false); // Set loading to false when not authenticated
     }
   }, [isAuthenticated]);
 
@@ -29,13 +30,17 @@ export function CartProvider({ children }) {
     setError(null);
     try {
       const response = await cartService.getAll();
-      console.log("Fetched cart items:", response.data.data);
-      setCartItems(response.data.data || []);
+      // Properly handle the case when data is an empty array
+      const items = response?.data?.data || [];
+      console.log("Fetched cart items:", items);
+      setCartItems(items);
+      return items; // Return the items for potential chaining
     } catch (err) {
       const message =
         err.response?.data?.message || "Failed to fetch cart items.";
       setError(message);
       console.error("Error fetching cart items:", err);
+      return []; // Return empty array on error
     } finally {
       setLoading(false);
     }
@@ -107,41 +112,48 @@ export function CartProvider({ children }) {
 
   // Calculate cart totals
   const getCartTotals = () => {
-    // Calculate total items
-    const totalItems = cartItems.reduce((sum, item) => {
-      const qty = parseInt(item.quantity) || 1;
-      return sum + qty;
-    }, 0);
+    // Handle empty cart case gracefully
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+      // Change log level from warn to debug or info
+      if (process.env.NODE_ENV === "development") {
+        console.log("Cart is empty or not loaded yet");
+      }
+      return { totalItems: 0, subtotal: 0 };
+    }
 
-    // Calculate subtotal with proper type handling
-    const subtotal = cartItems.reduce((sum, item) => {
-      // Check if activity exists
-      if (!item.activity) return sum;
+    try {
+      // Calculate total items
+      const totalItems = cartItems.reduce((sum, item) => {
+        if (!item) return sum;
+        const qty = parseInt(item.quantity) || 1;
+        return sum + qty;
+      }, 0);
 
-      // Use price_discount if available, otherwise use regular price
-      // Ensure it's converted to a number
-      const itemPrice = parseInt(
-        item.activity.price_discount || item.activity.price || 0
-      );
-      const qty = parseInt(item.quantity) || 1;
+      // Calculate subtotal
+      const subtotal = cartItems.reduce((sum, item) => {
+        // Skip invalid items
+        if (!item || !item.activity) return sum;
 
-      // Log for debugging
-      console.log(
-        `Total calc - Item: ${
-          item.activity.title
-        }, Price: ${itemPrice}, Qty: ${qty}, Total: ${itemPrice * qty}`
-      );
+        // Get the price (use price_discount if available, otherwise regular price)
+        let itemPrice = 0;
+        if (item.activity.price_discount) {
+          itemPrice = parseFloat(item.activity.price_discount);
+        } else if (item.activity.price) {
+          itemPrice = parseFloat(item.activity.price);
+        }
 
-      return sum + itemPrice * qty;
-    }, 0);
+        // Ensure we have a valid number
+        if (isNaN(itemPrice)) itemPrice = 0;
 
-    console.log(
-      "Cart totals calculated - Items:",
-      totalItems,
-      "Subtotal:",
-      subtotal
-    );
-    return { totalItems, subtotal };
+        const qty = parseInt(item.quantity) || 1;
+        return sum + itemPrice * qty;
+      }, 0);
+
+      return { totalItems, subtotal };
+    } catch (error) {
+      console.warn("Error calculating cart totals:", error);
+      return { totalItems: 0, subtotal: 0 };
+    }
   };
 
   return (
@@ -155,7 +167,7 @@ export function CartProvider({ children }) {
         removeFromCart,
         fetchCartItems,
         getCartTotals,
-        isEmpty: cartItems.length === 0,
+        isEmpty: !loading && cartItems.length === 0, // Only consider empty when not loading
       }}
     >
       {children}

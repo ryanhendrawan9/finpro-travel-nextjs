@@ -21,6 +21,7 @@ import { useAuth } from "@/context/AuthContext";
 import { transactionService } from "@/lib/api";
 import { toast } from "react-toastify";
 import debounce from "lodash/debounce";
+import { normalizeStatus } from "@/lib/transaction-helpers"; // Import helper
 
 export default function AdminTransactions() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -67,11 +68,15 @@ export default function AdminTransactions() {
           throw new Error("Invalid response format from server");
         }
 
-        // Process transactions to ensure they have valid amounts
+        // Process transactions to ensure they have valid amounts and normalized status
         const processedTransactions = (response.data.data || []).map(
           (transaction) => {
+            // Normalize status to handle inconsistencies
+            transaction.status = normalizeStatus(transaction.status);
+
             // If amount is missing or zero, calculate from cart items
             if (!transaction.amount || transaction.amount === 0) {
+              // Check cart field
               if (transaction.cart && transaction.cart.length > 0) {
                 let calculatedTotal = 0;
 
@@ -88,6 +93,47 @@ export default function AdminTransactions() {
                   transaction.amount = calculatedTotal;
                 }
               }
+              // Check transaction_items field as an alternative
+              else if (
+                transaction.transaction_items &&
+                transaction.transaction_items.length > 0
+              ) {
+                let calculatedTotal = 0;
+
+                transaction.transaction_items.forEach((item) => {
+                  const price = item.price_discount || item.price || 0;
+                  const quantity = item.quantity || 1;
+                  calculatedTotal += parseInt(price) * parseInt(quantity);
+                });
+
+                if (calculatedTotal > 0) {
+                  transaction.amount = calculatedTotal;
+                }
+              }
+
+              // Check totalAmount field
+              if (transaction.totalAmount && transaction.totalAmount > 0) {
+                transaction.amount = transaction.totalAmount;
+              }
+            }
+
+            // Ensure cart is available for display in modal
+            if (!transaction.cart && transaction.transaction_items) {
+              transaction.cart = transaction.transaction_items.map((item) => ({
+                id: item.id,
+                quantity: item.quantity || 1,
+                activity: {
+                  id: item.id,
+                  title: item.title || "Unnamed Activity",
+                  price: item.price || 0,
+                  price_discount: item.price_discount || null,
+                  imageUrls: Array.isArray(item.imageUrls)
+                    ? item.imageUrls
+                    : item.imageUrl
+                    ? [item.imageUrl]
+                    : [],
+                },
+              }));
             }
 
             return transaction;
@@ -118,8 +164,11 @@ export default function AdminTransactions() {
     const filterTransactions = () => {
       return transactions.filter((transaction) => {
         // Status filter
-        if (statusFilter !== "all" && transaction.status !== statusFilter) {
-          return false;
+        if (statusFilter !== "all") {
+          const normalizedStatus = normalizeStatus(transaction.status);
+          if (normalizedStatus !== statusFilter) {
+            return false;
+          }
         }
 
         // Search query filter - only process if there's a search query
@@ -204,7 +253,10 @@ export default function AdminTransactions() {
         text: "Unknown",
       };
 
-    switch (status) {
+    // Normalize status first
+    const normalizedStatus = normalizeStatus(status);
+
+    switch (normalizedStatus) {
       case "waiting-for-payment":
         return {
           color: "text-yellow-600 bg-yellow-100",
@@ -258,7 +310,9 @@ export default function AdminTransactions() {
       setTransactions(updatedTransactions);
       setFilteredTransactions(
         updatedTransactions.filter(
-          (trans) => statusFilter === "all" || trans.status === statusFilter
+          (trans) =>
+            statusFilter === "all" ||
+            normalizeStatus(trans.status) === statusFilter
         )
       );
 
@@ -291,13 +345,17 @@ export default function AdminTransactions() {
       try {
         const response = await transactionService.getAllTransactions();
 
+        // Process transactions with normalized status and valid amounts
         const processedTransactions = (response.data.data || []).map(
           (transaction) => {
-            // If amount is missing or zero, calculate from cart items
+            // Normalize status
+            transaction.status = normalizeStatus(transaction.status);
+
+            // Calculate amounts if needed
             if (!transaction.amount || transaction.amount === 0) {
+              // Check cart field
               if (transaction.cart && transaction.cart.length > 0) {
                 let calculatedTotal = 0;
-
                 transaction.cart.forEach((item) => {
                   if (item.activity) {
                     const price =
@@ -306,11 +364,49 @@ export default function AdminTransactions() {
                     calculatedTotal += parseInt(price) * parseInt(quantity);
                   }
                 });
-
                 if (calculatedTotal > 0) {
                   transaction.amount = calculatedTotal;
                 }
               }
+              // Check transaction_items as alternative
+              else if (
+                transaction.transaction_items &&
+                transaction.transaction_items.length > 0
+              ) {
+                let calculatedTotal = 0;
+                transaction.transaction_items.forEach((item) => {
+                  const price = item.price_discount || item.price || 0;
+                  const quantity = item.quantity || 1;
+                  calculatedTotal += parseInt(price) * parseInt(quantity);
+                });
+                if (calculatedTotal > 0) {
+                  transaction.amount = calculatedTotal;
+                }
+              }
+
+              // Check totalAmount field
+              if (transaction.totalAmount && transaction.totalAmount > 0) {
+                transaction.amount = transaction.totalAmount;
+              }
+            }
+
+            // Ensure cart is available for display in modal
+            if (!transaction.cart && transaction.transaction_items) {
+              transaction.cart = transaction.transaction_items.map((item) => ({
+                id: item.id,
+                quantity: item.quantity || 1,
+                activity: {
+                  id: item.id,
+                  title: item.title || "Unnamed Activity",
+                  price: item.price || 0,
+                  price_discount: item.price_discount || null,
+                  imageUrls: Array.isArray(item.imageUrls)
+                    ? item.imageUrls
+                    : item.imageUrl
+                    ? [item.imageUrl]
+                    : [],
+                },
+              }));
             }
 
             return transaction;
@@ -491,7 +587,9 @@ export default function AdminTransactions() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                        {formatCurrency(transaction.amount)}
+                        {formatCurrency(
+                          transaction.amount || transaction.totalAmount
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span
@@ -521,7 +619,7 @@ export default function AdminTransactions() {
                             <FiExternalLink size={18} />
                           </Link>
 
-                          {transaction.status ===
+                          {normalizeStatus(transaction.status) ===
                             "waiting-for-confirmation" && (
                             <>
                               <button
@@ -742,7 +840,10 @@ export default function AdminTransactions() {
                   <div className="flex flex-col">
                     <span className="text-sm text-gray-500">Amount</span>
                     <span className="text-xl font-bold text-primary-600">
-                      {formatCurrency(selectedTransaction.amount)}
+                      {formatCurrency(
+                        selectedTransaction.amount ||
+                          selectedTransaction.totalAmount
+                      )}
                     </span>
                   </div>
                   <div className="flex flex-col">
@@ -750,7 +851,9 @@ export default function AdminTransactions() {
                       Payment Method
                     </span>
                     <span className="font-medium">
-                      {selectedTransaction.paymentMethod?.name || "N/A"}
+                      {selectedTransaction.paymentMethod?.name ||
+                        selectedTransaction.payment_method?.name ||
+                        "N/A"}
                     </span>
                   </div>
                   <div className="flex flex-col">
@@ -777,7 +880,11 @@ export default function AdminTransactions() {
             {/* Items */}
             <div className="mt-6">
               <h3 className="mb-3 text-lg font-medium text-gray-900">
-                Items ({selectedTransaction.cart?.length || 0})
+                Items (
+                {selectedTransaction.cart?.length ||
+                  selectedTransaction.transaction_items?.length ||
+                  0}
+                )
               </h3>
               <div className="overflow-hidden border rounded-lg">
                 <table className="min-w-full divide-y divide-gray-200">
@@ -810,70 +917,79 @@ export default function AdminTransactions() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {selectedTransaction.cart &&
-                      selectedTransaction.cart.map((item, index) => {
-                        const price =
-                          item.activity?.price_discount ||
-                          item.activity?.price ||
-                          0;
-                        const quantity = item.quantity || 1;
-                        const itemTotal = price * quantity;
+                    {(
+                      selectedTransaction.cart ||
+                      selectedTransaction.transaction_items ||
+                      []
+                    ).map((item, index) => {
+                      // Handle different data structures
+                      const activityData = item.activity || item;
+                      const price =
+                        activityData.price_discount || activityData.price || 0;
+                      const quantity = item.quantity || 1;
+                      const itemTotal = price * quantity;
+                      const imageUrl =
+                        Array.isArray(activityData.imageUrls) &&
+                        activityData.imageUrls.length > 0
+                          ? activityData.imageUrls[0]
+                          : activityData.imageUrl ||
+                            "/images/placeholders/activity-placeholder.jpg";
 
-                        return (
-                          <tr key={item.id || index}>
-                            <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div className="w-10 h-10 mr-3 overflow-hidden rounded-lg">
-                                  <img
-                                    src={
-                                      item.activity?.imageUrls?.[0] ||
-                                      "/images/placeholders/activity-placeholder.jpg"
-                                    }
-                                    alt={item.activity?.title || "Activity"}
-                                    className="object-cover w-full h-full"
-                                    onError={(e) => {
-                                      e.target.onerror = null;
-                                      e.target.src =
-                                        "/images/placeholders/activity-placeholder.jpg";
-                                    }}
-                                  />
-                                </div>
-                                <div className="font-medium">
-                                  {item.activity?.title || "Unknown Activity"}
-                                </div>
+                      return (
+                        <tr key={item.id || index}>
+                          <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="w-10 h-10 mr-3 overflow-hidden rounded-lg">
+                                <img
+                                  src={imageUrl}
+                                  alt={activityData.title || "Activity"}
+                                  className="object-cover w-full h-full"
+                                  onError={(e) => {
+                                    e.target.onerror = null;
+                                    e.target.src =
+                                      "/images/placeholders/activity-placeholder.jpg";
+                                  }}
+                                />
                               </div>
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                              {formatCurrency(price)}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                              {quantity}
-                            </td>
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                              {formatCurrency(itemTotal)}
-                            </td>
-                          </tr>
-                        );
-                      })}
+                              <div className="font-medium">
+                                {activityData.title || "Unknown Activity"}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                            {formatCurrency(price)}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                            {quantity}
+                          </td>
+                          <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                            {formatCurrency(itemTotal)}
+                          </td>
+                        </tr>
+                      );
+                    })}
 
                     {(!selectedTransaction.cart ||
-                      selectedTransaction.cart.length === 0) && (
-                      <tr>
-                        <td
-                          colSpan="4"
-                          className="px-6 py-4 text-sm text-center text-gray-500"
-                        >
-                          No items found.
-                        </td>
-                      </tr>
-                    )}
+                      selectedTransaction.cart.length === 0) &&
+                      (!selectedTransaction.transaction_items ||
+                        selectedTransaction.transaction_items.length === 0) && (
+                        <tr>
+                          <td
+                            colSpan="4"
+                            className="px-6 py-4 text-sm text-center text-gray-500"
+                          >
+                            No items found.
+                          </td>
+                        </tr>
+                      )}
                   </tbody>
                 </table>
               </div>
             </div>
 
             {/* Actions */}
-            {selectedTransaction.status === "waiting-for-confirmation" && (
+            {normalizeStatus(selectedTransaction.status) ===
+              "waiting-for-confirmation" && (
               <div className="flex justify-end mt-6 space-x-4">
                 <button
                   onClick={() =>
