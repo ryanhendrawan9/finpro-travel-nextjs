@@ -1,24 +1,11 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { FiMail, FiLock, FiArrowRight } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
-
-function RegisteredCheck() {
-  const searchParams = useSearchParams();
-
-  useEffect(() => {
-    const registered = searchParams.get("registered");
-    if (registered === "true") {
-      // Could add a success message here
-    }
-  }, [searchParams]);
-
-  return null;
-}
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -28,6 +15,15 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Check if user was just registered
+  useEffect(() => {
+    const registered = searchParams.get("registered");
+    if (registered === "true") {
+      // Could add a success message here
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -61,11 +57,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Wrap the component using useSearchParams in Suspense */}
-      <Suspense fallback={null}>
-        <RegisteredCheck />
-      </Suspense>
-
       {/* Left side image - visible on medium screens and up */}
       <div className="hidden md:block md:w-1/2 bg-primary-600">
         <div className="relative h-full">
