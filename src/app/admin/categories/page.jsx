@@ -62,12 +62,42 @@ export default function AdminCategories() {
         setIsLoading(true);
         setError(null);
         const response = await categoryService.getAll();
-        const categoriesData = response.data.data || [];
+
+        // Safely access the data
+        const responseData = response?.data?.data;
+        if (!responseData || !Array.isArray(responseData)) {
+          console.warn("Unexpected response format:", response);
+          setCategories([]);
+          setFilteredCategories([]);
+          return;
+        }
+
+        // Ensure each category has all required properties and valid ID
+        const categoriesData = responseData
+          .map((category) => {
+            if (!category) return null; // Skip null items
+
+            return {
+              ...category,
+              id:
+                category.id ||
+                `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              name: category.name || "",
+              imageUrl: category.imageUrl || "",
+            };
+          })
+          .filter(Boolean); // Remove any null items
+
         setCategories(categoriesData);
         setFilteredCategories(categoriesData);
       } catch (err) {
         setError("Failed to load categories. Please try again.");
         console.error("Error fetching categories:", err);
+        console.error("Error details:", {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+        });
         toast.error("Failed to load categories. Please try again later.");
       } finally {
         setIsLoading(false);
@@ -163,9 +193,19 @@ export default function AdminCategories() {
           formData
         );
 
-        // Update main categories list
+        // Defensively handle the response data structure
+        const responseData = response?.data?.data || {};
+
+        // Update main categories list - make sure to set default values for missing properties
+        const updatedCategory = {
+          ...responseData,
+          id: responseData.id || currentCategory.id, // Preserve the ID if it's missing in response
+          name: responseData?.name || formData.name || "",
+          imageUrl: responseData?.imageUrl || formData.imageUrl || "",
+        };
+
         const updatedCategories = categories.map((cat) =>
-          cat.id === currentCategory.id ? response.data.data : cat
+          cat.id === currentCategory.id ? updatedCategory : cat
         );
         setCategories(updatedCategories);
 
@@ -185,8 +225,18 @@ export default function AdminCategories() {
         // Create new category
         const response = await categoryService.create(formData);
 
-        // Add to main categories list
-        const updatedCategories = [...categories, response.data.data];
+        // Defensively handle the response data structure
+        const responseData = response?.data?.data || {};
+
+        // Add to main categories list - make sure to set default values for missing properties
+        const newCategory = {
+          ...responseData,
+          id: responseData.id || `temp-${Date.now()}`, // Generate temp ID if missing
+          name: responseData?.name || formData.name || "",
+          imageUrl: responseData?.imageUrl || formData.imageUrl || "",
+        };
+
+        const updatedCategories = [...categories, newCategory];
         setCategories(updatedCategories);
 
         // Re-apply search filter
@@ -207,6 +257,12 @@ export default function AdminCategories() {
       setFormData({ name: "", imageUrl: "" });
     } catch (err) {
       console.error("Error saving category:", err);
+      // Log detailed error information
+      console.error("Error details:", {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+      });
       toast.error("Failed to save category. Please try again.");
     } finally {
       setFormLoading(false);
@@ -220,13 +276,44 @@ export default function AdminCategories() {
         setIsLoading(true);
         setError(null);
         const response = await categoryService.getAll();
-        const categoriesData = response.data.data || [];
+
+        // Safely access the data
+        const responseData = response?.data?.data;
+        if (!responseData || !Array.isArray(responseData)) {
+          console.warn("Unexpected response format:", response);
+          setCategories([]);
+          setFilteredCategories([]);
+          toast.warning("Received empty or invalid data from server");
+          return;
+        }
+
+        // Ensure each category has all required properties and valid ID
+        const categoriesData = responseData
+          .map((category) => {
+            if (!category) return null; // Skip null items
+
+            return {
+              ...category,
+              id:
+                category.id ||
+                `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              name: category.name || "",
+              imageUrl: category.imageUrl || "",
+            };
+          })
+          .filter(Boolean); // Remove any null items
+
         setCategories(categoriesData);
         setFilteredCategories(categoriesData);
         toast.success("Categories loaded successfully");
       } catch (err) {
         setError("Failed to load categories. Please try again.");
         console.error("Error retrying categories fetch:", err);
+        console.error("Error details:", {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status,
+        });
         toast.error("Failed to load categories. Please try again later.");
       } finally {
         setIsLoading(false);
@@ -360,10 +447,10 @@ export default function AdminCategories() {
                     <div className="w-12 h-12 overflow-hidden rounded-lg">
                       <img
                         src={
-                          category.imageUrl ||
+                          (category && category.imageUrl) ||
                           "/images/placeholders/category-placeholder.jpg"
                         }
-                        alt={category.name}
+                        alt={category?.name || "Category"}
                         className="object-cover w-full h-full"
                         onError={(e) => {
                           e.target.onerror = null;
@@ -374,7 +461,7 @@ export default function AdminCategories() {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                    {category.name}
+                    {category?.name || ""}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                     <div className="flex space-x-2">
@@ -517,7 +604,7 @@ export default function AdminCategories() {
                   type="url"
                   id="imageUrl"
                   name="imageUrl"
-                  value={formData.imageUrl}
+                  value={formData.imageUrl || ""}
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                   placeholder="https://example.com/image.jpg"
@@ -525,7 +612,10 @@ export default function AdminCategories() {
                 {formData.imageUrl && (
                   <div className="mt-2">
                     <img
-                      src={formData.imageUrl}
+                      src={
+                        formData.imageUrl ||
+                        "/images/placeholders/category-placeholder.jpg"
+                      }
                       alt="Preview"
                       className="object-cover w-full h-32 rounded-lg"
                       onError={(e) => {
