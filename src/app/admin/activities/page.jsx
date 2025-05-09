@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -11,15 +11,19 @@ import {
   FiArrowLeft,
   FiMapPin,
   FiStar,
+  FiSearch,
+  FiFilter,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 import { activityService, categoryService } from "@/lib/api";
 import { toast } from "react-toastify";
+import debounce from "lodash/debounce";
 
 export default function AdminActivities() {
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const [activities, setActivities] = useState([]);
+  const [filteredActivities, setFilteredActivities] = useState([]);
   const [categories, setCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -42,6 +46,23 @@ export default function AdminActivities() {
   });
   const [formLoading, setFormLoading] = useState(false);
 
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const activitiesPerPage = 10;
+
+  // Debounce search function
+  const debouncedSetSearch = useCallback(
+    debounce((value) => {
+      setDebouncedSearchQuery(value);
+    }, 300),
+    []
+  );
+
   // Auth check
   useEffect(() => {
     if (!loading && (!isAuthenticated || (user && user.role !== "admin"))) {
@@ -53,15 +74,22 @@ export default function AdminActivities() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setIsLoading(true);
+        setError(null);
         const [activitiesRes, categoriesRes] = await Promise.all([
           activityService.getAll(),
           categoryService.getAll(),
         ]);
-        setActivities(activitiesRes.data.data || []);
-        setCategories(categoriesRes.data.data || []);
+        const activitiesData = activitiesRes.data.data || [];
+        const categoriesData = categoriesRes.data.data || [];
+
+        setActivities(activitiesData);
+        setFilteredActivities(activitiesData);
+        setCategories(categoriesData);
       } catch (err) {
         setError("Failed to load data. Please try again.");
         console.error("Error fetching data:", err);
+        toast.error("Failed to load activities. Please try again later.");
       } finally {
         setIsLoading(false);
       }
@@ -71,6 +99,46 @@ export default function AdminActivities() {
       fetchData();
     }
   }, [isAuthenticated, user]);
+
+  // Filter activities when search or category filter changes
+  useEffect(() => {
+    const filterActivities = () => {
+      return activities.filter((activity) => {
+        // Category filter
+        if (
+          categoryFilter !== "all" &&
+          activity.categoryId !== categoryFilter
+        ) {
+          return false;
+        }
+
+        // Search query filter
+        if (debouncedSearchQuery) {
+          const query = debouncedSearchQuery.toLowerCase();
+          const title = activity.title?.toLowerCase() || "";
+          const description = activity.description?.toLowerCase() || "";
+          const city = activity.city?.toLowerCase() || "";
+          const province = activity.province?.toLowerCase() || "";
+
+          return (
+            title.includes(query) ||
+            description.includes(query) ||
+            city.includes(query) ||
+            province.includes(query)
+          );
+        }
+
+        return true;
+      });
+    };
+
+    // Apply the filters
+    const filtered = filterActivities();
+    setFilteredActivities(filtered);
+
+    // Reset to first page when filters change
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, categoryFilter, activities]);
 
   // Handle edit activity
   const handleEdit = (activity) => {
@@ -99,8 +167,29 @@ export default function AdminActivities() {
 
     try {
       await activityService.delete(id);
-      setActivities(activities.filter((activity) => activity.id !== id));
+
+      // Update both activities and filtered activities
+      const updatedActivities = activities.filter(
+        (activity) => activity.id !== id
+      );
+      setActivities(updatedActivities);
+
+      // Apply filters to the updated activities
+      const updatedFilteredActivities = updatedActivities.filter(
+        (activity) =>
+          categoryFilter === "all" || activity.categoryId === categoryFilter
+      );
+      setFilteredActivities(updatedFilteredActivities);
+
       toast.success("Activity deleted successfully");
+
+      // Check if we need to adjust the current page after deletion
+      const totalPages = Math.ceil(
+        updatedFilteredActivities.length / activitiesPerPage
+      );
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(totalPages);
+      }
     } catch (err) {
       console.error("Error deleting activity:", err);
       toast.error("Failed to delete activity. Please try again.");
@@ -169,16 +258,36 @@ export default function AdminActivities() {
           currentActivity.id,
           dataToSubmit
         );
-        setActivities(
-          activities.map((a) =>
-            a.id === currentActivity.id ? response.data.data : a
-          )
+
+        // Update main activities list
+        const updatedActivities = activities.map((a) =>
+          a.id === currentActivity.id ? response.data.data : a
         );
+        setActivities(updatedActivities);
+
+        // Re-apply filters
+        const updatedFilteredActivities = updatedActivities.filter(
+          (activity) =>
+            categoryFilter === "all" || activity.categoryId === categoryFilter
+        );
+        setFilteredActivities(updatedFilteredActivities);
+
         toast.success("Activity updated successfully");
       } else {
         // Create new activity
         const response = await activityService.create(dataToSubmit);
-        setActivities([...activities, response.data.data]);
+
+        // Add to main activities list
+        const updatedActivities = [...activities, response.data.data];
+        setActivities(updatedActivities);
+
+        // Re-apply filters
+        const updatedFilteredActivities = updatedActivities.filter(
+          (activity) =>
+            categoryFilter === "all" || activity.categoryId === categoryFilter
+        );
+        setFilteredActivities(updatedFilteredActivities);
+
         toast.success("Activity created successfully");
       }
       setIsFormOpen(false);
@@ -210,6 +319,45 @@ export default function AdminActivities() {
       location_maps: "",
     });
   };
+
+  // Retry fetching data
+  const retryFetchData = async () => {
+    if (isAuthenticated && user?.role === "admin") {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const [activitiesRes, categoriesRes] = await Promise.all([
+          activityService.getAll(),
+          categoryService.getAll(),
+        ]);
+        const activitiesData = activitiesRes.data.data || [];
+        const categoriesData = categoriesRes.data.data || [];
+
+        setActivities(activitiesData);
+        setFilteredActivities(activitiesData);
+        setCategories(categoriesData);
+        toast.success("Data loaded successfully");
+      } catch (err) {
+        setError("Failed to load data. Please try again.");
+        console.error("Error retrying data fetch:", err);
+        toast.error("Failed to load activities. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Pagination logic
+  const indexOfLastActivity = currentPage * activitiesPerPage;
+  const indexOfFirstActivity = indexOfLastActivity - activitiesPerPage;
+  const currentActivities = filteredActivities.slice(
+    indexOfFirstActivity,
+    indexOfLastActivity
+  );
+  const totalPages = Math.ceil(filteredActivities.length / activitiesPerPage);
+
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   if (loading || isLoading) {
     return (
@@ -248,6 +396,65 @@ export default function AdminActivities() {
             <FiPlus className="mr-2" />
             Add Activity
           </button>
+        </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="p-4 mb-6 text-red-700 bg-red-100 border border-red-300 rounded-lg">
+            <div className="flex items-center">
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>{error}</span>
+            </div>
+            <button
+              onClick={retryFetchData}
+              className="px-4 py-2 mt-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Filters */}
+        <div className="flex flex-col mb-6 space-y-4 md:space-y-0 md:space-x-4 md:flex-row md:items-center">
+          <div className="relative flex-grow">
+            <FiSearch className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
+            <input
+              type="text"
+              placeholder="Search by title, location..."
+              className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                debouncedSetSearch(e.target.value);
+              }}
+            />
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <FiFilter className="text-gray-500" />
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Activity list */}
@@ -295,7 +502,7 @@ export default function AdminActivities() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {activities.map((activity) => {
+                {currentActivities.map((activity) => {
                   // Find category name
                   const category = categories.find(
                     (c) => c.id === activity.categoryId
@@ -372,13 +579,15 @@ export default function AdminActivities() {
                   );
                 })}
 
-                {activities.length === 0 && (
+                {currentActivities.length === 0 && (
                   <tr>
                     <td
                       colSpan="6"
                       className="px-6 py-4 text-sm text-center text-gray-500"
                     >
-                      No activities found.
+                      {debouncedSearchQuery || categoryFilter !== "all"
+                        ? "No activities found matching your search criteria."
+                        : "No activities found. Click 'Add Activity' to create one."}
                     </td>
                   </tr>
                 )}
@@ -386,6 +595,74 @@ export default function AdminActivities() {
             </table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center mt-6 space-x-2">
+            <button
+              onClick={() => paginate(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 rounded-md ${
+                currentPage === 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Previous
+            </button>
+
+            {/* Logic for showing limited page numbers */}
+            {Array.from({ length: totalPages }, (_, i) => {
+              const pageNumber = i + 1;
+              // Show first page, last page, current page, and pages adjacent to current page
+              if (
+                pageNumber === 1 ||
+                pageNumber === totalPages ||
+                (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)
+              ) {
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => paginate(pageNumber)}
+                    className={`px-3 py-1 rounded-md ${
+                      currentPage === pageNumber
+                        ? "bg-primary-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              }
+
+              // Show ellipsis for skipped pages
+              if (
+                (pageNumber === currentPage - 3 && pageNumber > 1) ||
+                (pageNumber === currentPage + 3 && pageNumber < totalPages)
+              ) {
+                return (
+                  <span key={pageNumber} className="px-3 py-1">
+                    ...
+                  </span>
+                );
+              }
+
+              return null;
+            })}
+
+            <button
+              onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 rounded-md ${
+                currentPage === totalPages
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Activity form modal */}

@@ -1,19 +1,27 @@
 // src/app/admin/categories/page.jsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { FiEdit, FiTrash2, FiPlus, FiArrowLeft } from "react-icons/fi";
+import {
+  FiEdit,
+  FiTrash2,
+  FiPlus,
+  FiArrowLeft,
+  FiSearch,
+} from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 import { categoryService } from "@/lib/api";
 import { toast } from "react-toastify";
+import debounce from "lodash/debounce";
 
 export default function AdminCategories() {
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const [categories, setCategories] = useState([]);
+  const [filteredCategories, setFilteredCategories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -23,6 +31,22 @@ export default function AdminCategories() {
     imageUrl: "",
   });
   const [formLoading, setFormLoading] = useState(false);
+
+  // Search states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const categoriesPerPage = 10;
+
+  // Debounce search function
+  const debouncedSetSearch = useCallback(
+    debounce((value) => {
+      setDebouncedSearchQuery(value);
+    }, 300),
+    []
+  );
 
   // Auth check
   useEffect(() => {
@@ -35,11 +59,16 @@ export default function AdminCategories() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
+        setIsLoading(true);
+        setError(null);
         const response = await categoryService.getAll();
-        setCategories(response.data.data || []);
+        const categoriesData = response.data.data || [];
+        setCategories(categoriesData);
+        setFilteredCategories(categoriesData);
       } catch (err) {
         setError("Failed to load categories. Please try again.");
         console.error("Error fetching categories:", err);
+        toast.error("Failed to load categories. Please try again later.");
       } finally {
         setIsLoading(false);
       }
@@ -49,6 +78,22 @@ export default function AdminCategories() {
       fetchCategories();
     }
   }, [isAuthenticated, user]);
+
+  // Filter categories when search changes
+  useEffect(() => {
+    if (!debouncedSearchQuery) {
+      setFilteredCategories(categories);
+      return;
+    }
+
+    const filtered = categories.filter((category) => {
+      const name = category.name?.toLowerCase() || "";
+      return name.includes(debouncedSearchQuery.toLowerCase());
+    });
+
+    setFilteredCategories(filtered);
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, categories]);
 
   // Handle edit category
   const handleEdit = (category) => {
@@ -66,8 +111,33 @@ export default function AdminCategories() {
 
     try {
       await categoryService.delete(id);
-      setCategories(categories.filter((category) => category.id !== id));
+
+      // Update both categories and filtered categories
+      const updatedCategories = categories.filter(
+        (category) => category.id !== id
+      );
+      setCategories(updatedCategories);
+
+      // Apply search filter to updated categories
+      if (debouncedSearchQuery) {
+        const filtered = updatedCategories.filter((category) => {
+          const name = category.name?.toLowerCase() || "";
+          return name.includes(debouncedSearchQuery.toLowerCase());
+        });
+        setFilteredCategories(filtered);
+      } else {
+        setFilteredCategories(updatedCategories);
+      }
+
       toast.success("Category deleted successfully");
+
+      // Check if we need to adjust the current page after deletion
+      const totalPages = Math.ceil(
+        filteredCategories.length / categoriesPerPage
+      );
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(totalPages);
+      }
     } catch (err) {
       console.error("Error deleting category:", err);
       toast.error("Failed to delete category. Please try again.");
@@ -92,16 +162,44 @@ export default function AdminCategories() {
           currentCategory.id,
           formData
         );
-        setCategories(
-          categories.map((cat) =>
-            cat.id === currentCategory.id ? response.data.data : cat
-          )
+
+        // Update main categories list
+        const updatedCategories = categories.map((cat) =>
+          cat.id === currentCategory.id ? response.data.data : cat
         );
+        setCategories(updatedCategories);
+
+        // Re-apply search filter
+        if (debouncedSearchQuery) {
+          const filtered = updatedCategories.filter((category) => {
+            const name = category.name?.toLowerCase() || "";
+            return name.includes(debouncedSearchQuery.toLowerCase());
+          });
+          setFilteredCategories(filtered);
+        } else {
+          setFilteredCategories(updatedCategories);
+        }
+
         toast.success("Category updated successfully");
       } else {
         // Create new category
         const response = await categoryService.create(formData);
-        setCategories([...categories, response.data.data]);
+
+        // Add to main categories list
+        const updatedCategories = [...categories, response.data.data];
+        setCategories(updatedCategories);
+
+        // Re-apply search filter
+        if (debouncedSearchQuery) {
+          const filtered = updatedCategories.filter((category) => {
+            const name = category.name?.toLowerCase() || "";
+            return name.includes(debouncedSearchQuery.toLowerCase());
+          });
+          setFilteredCategories(filtered);
+        } else {
+          setFilteredCategories(updatedCategories);
+        }
+
         toast.success("Category created successfully");
       }
       setIsFormOpen(false);
@@ -114,6 +212,39 @@ export default function AdminCategories() {
       setFormLoading(false);
     }
   };
+
+  // Retry fetching categories
+  const retryFetchCategories = async () => {
+    if (isAuthenticated && user?.role === "admin") {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await categoryService.getAll();
+        const categoriesData = response.data.data || [];
+        setCategories(categoriesData);
+        setFilteredCategories(categoriesData);
+        toast.success("Categories loaded successfully");
+      } catch (err) {
+        setError("Failed to load categories. Please try again.");
+        console.error("Error retrying categories fetch:", err);
+        toast.error("Failed to load categories. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Pagination logic
+  const indexOfLastCategory = currentPage * categoriesPerPage;
+  const indexOfFirstCategory = indexOfLastCategory - categoriesPerPage;
+  const currentCategories = filteredCategories.slice(
+    indexOfFirstCategory,
+    indexOfLastCategory
+  );
+  const totalPages = Math.ceil(filteredCategories.length / categoriesPerPage);
+
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   if (loading || isLoading) {
     return (
@@ -154,6 +285,49 @@ export default function AdminCategories() {
           </button>
         </div>
 
+        {/* Error message */}
+        {error && (
+          <div className="p-4 mb-6 text-red-700 bg-red-100 border border-red-300 rounded-lg">
+            <div className="flex items-center">
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>{error}</span>
+            </div>
+            <button
+              onClick={retryFetchCategories}
+              className="px-4 py-2 mt-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <FiSearch className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
+            <input
+              type="text"
+              placeholder="Search categories..."
+              className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                debouncedSetSearch(e.target.value);
+              }}
+            />
+          </div>
+        </div>
+
         {/* Category list */}
         <div className="overflow-hidden bg-white shadow-sm rounded-xl">
           <table className="min-w-full divide-y divide-gray-200">
@@ -180,7 +354,7 @@ export default function AdminCategories() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {categories.map((category) => (
+              {currentCategories.map((category) => (
                 <tr key={category.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="w-12 h-12 overflow-hidden rounded-lg">
@@ -221,19 +395,89 @@ export default function AdminCategories() {
                 </tr>
               ))}
 
-              {categories.length === 0 && (
+              {currentCategories.length === 0 && (
                 <tr>
                   <td
                     colSpan="3"
                     className="px-6 py-4 text-sm text-center text-gray-500"
                   >
-                    No categories found.
+                    {debouncedSearchQuery
+                      ? "No categories found matching your search."
+                      : "No categories found. Click 'Add Category' to create one."}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center mt-6 space-x-2">
+            <button
+              onClick={() => paginate(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 rounded-md ${
+                currentPage === 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Previous
+            </button>
+
+            {/* Logic for showing limited page numbers */}
+            {Array.from({ length: totalPages }, (_, i) => {
+              const pageNumber = i + 1;
+              // Show first page, last page, current page, and pages adjacent to current page
+              if (
+                pageNumber === 1 ||
+                pageNumber === totalPages ||
+                (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)
+              ) {
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => paginate(pageNumber)}
+                    className={`px-3 py-1 rounded-md ${
+                      currentPage === pageNumber
+                        ? "bg-primary-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              }
+
+              // Show ellipsis for skipped pages
+              if (
+                (pageNumber === currentPage - 3 && pageNumber > 1) ||
+                (pageNumber === currentPage + 3 && pageNumber < totalPages)
+              ) {
+                return (
+                  <span key={pageNumber} className="px-3 py-1">
+                    ...
+                  </span>
+                );
+              }
+
+              return null;
+            })}
+
+            <button
+              onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 rounded-md ${
+                currentPage === totalPages
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Category form modal */}

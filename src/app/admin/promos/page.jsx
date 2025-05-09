@@ -1,18 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { FiEdit, FiTrash2, FiPlus, FiArrowLeft, FiTag } from "react-icons/fi";
+import {
+  FiEdit,
+  FiTrash2,
+  FiPlus,
+  FiArrowLeft,
+  FiTag,
+  FiSearch,
+} from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 import { promoService } from "@/lib/api";
 import { toast } from "react-toastify";
+import debounce from "lodash/debounce";
 
 export default function AdminPromos() {
   const { user, isAuthenticated, loading } = useAuth();
   const router = useRouter();
   const [promos, setPromos] = useState([]);
+  const [filteredPromos, setFilteredPromos] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -28,6 +37,20 @@ export default function AdminPromos() {
   });
   const [formLoading, setFormLoading] = useState(false);
 
+  // Search and pagination states
+  const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const promosPerPage = 10;
+
+  // Debounce search function
+  const debouncedSetSearch = useCallback(
+    debounce((value) => {
+      setDebouncedSearchQuery(value);
+    }, 300),
+    []
+  );
+
   // Auth check
   useEffect(() => {
     if (!loading && (!isAuthenticated || (user && user.role !== "admin"))) {
@@ -39,11 +62,16 @@ export default function AdminPromos() {
   useEffect(() => {
     const fetchPromos = async () => {
       try {
+        setIsLoading(true);
+        setError(null);
         const response = await promoService.getAll();
-        setPromos(response.data.data || []);
+        const promosData = response.data.data || [];
+        setPromos(promosData);
+        setFilteredPromos(promosData);
       } catch (err) {
         setError("Failed to load promos. Please try again.");
         console.error("Error fetching promos:", err);
+        toast.error("Failed to load promos. Please try again later.");
       } finally {
         setIsLoading(false);
       }
@@ -53,6 +81,30 @@ export default function AdminPromos() {
       fetchPromos();
     }
   }, [isAuthenticated, user]);
+
+  // Filter promos when search changes
+  useEffect(() => {
+    if (!debouncedSearchQuery) {
+      setFilteredPromos(promos);
+      return;
+    }
+
+    const filtered = promos.filter((promo) => {
+      const query = debouncedSearchQuery.toLowerCase();
+      const title = promo.title?.toLowerCase() || "";
+      const description = promo.description?.toLowerCase() || "";
+      const promoCode = promo.promo_code?.toLowerCase() || "";
+
+      return (
+        title.includes(query) ||
+        description.includes(query) ||
+        promoCode.includes(query)
+      );
+    });
+
+    setFilteredPromos(filtered);
+    setCurrentPage(1); // Reset to first page when search changes
+  }, [debouncedSearchQuery, promos]);
 
   // Handle edit promo
   const handleEdit = (promo) => {
@@ -75,8 +127,37 @@ export default function AdminPromos() {
 
     try {
       await promoService.delete(id);
-      setPromos(promos.filter((promo) => promo.id !== id));
+
+      // Update both promos and filtered promos
+      const updatedPromos = promos.filter((promo) => promo.id !== id);
+      setPromos(updatedPromos);
+
+      // Apply search filter to updated promos
+      if (debouncedSearchQuery) {
+        const filtered = updatedPromos.filter((promo) => {
+          const query = debouncedSearchQuery.toLowerCase();
+          const title = promo.title?.toLowerCase() || "";
+          const description = promo.description?.toLowerCase() || "";
+          const promoCode = promo.promo_code?.toLowerCase() || "";
+
+          return (
+            title.includes(query) ||
+            description.includes(query) ||
+            promoCode.includes(query)
+          );
+        });
+        setFilteredPromos(filtered);
+      } else {
+        setFilteredPromos(updatedPromos);
+      }
+
       toast.success("Promo deleted successfully");
+
+      // Check if we need to adjust the current page after deletion
+      const totalPages = Math.ceil(filteredPromos.length / promosPerPage);
+      if (currentPage > totalPages && totalPages > 0) {
+        setCurrentPage(totalPages);
+      }
     } catch (err) {
       console.error("Error deleting promo:", err);
       toast.error("Failed to delete promo. Please try again.");
@@ -101,14 +182,60 @@ export default function AdminPromos() {
       if (currentPromo) {
         // Update existing promo
         const response = await promoService.update(currentPromo.id, formData);
-        setPromos(
-          promos.map((p) => (p.id === currentPromo.id ? response.data.data : p))
+
+        // Update main promos list
+        const updatedPromos = promos.map((p) =>
+          p.id === currentPromo.id ? response.data.data : p
         );
+        setPromos(updatedPromos);
+
+        // Re-apply search filter
+        if (debouncedSearchQuery) {
+          const filtered = updatedPromos.filter((promo) => {
+            const query = debouncedSearchQuery.toLowerCase();
+            const title = promo.title?.toLowerCase() || "";
+            const description = promo.description?.toLowerCase() || "";
+            const promoCode = promo.promo_code?.toLowerCase() || "";
+
+            return (
+              title.includes(query) ||
+              description.includes(query) ||
+              promoCode.includes(query)
+            );
+          });
+          setFilteredPromos(filtered);
+        } else {
+          setFilteredPromos(updatedPromos);
+        }
+
         toast.success("Promo updated successfully");
       } else {
         // Create new promo
         const response = await promoService.create(formData);
-        setPromos([...promos, response.data.data]);
+
+        // Add to main promos list
+        const updatedPromos = [...promos, response.data.data];
+        setPromos(updatedPromos);
+
+        // Re-apply search filter
+        if (debouncedSearchQuery) {
+          const filtered = updatedPromos.filter((promo) => {
+            const query = debouncedSearchQuery.toLowerCase();
+            const title = promo.title?.toLowerCase() || "";
+            const description = promo.description?.toLowerCase() || "";
+            const promoCode = promo.promo_code?.toLowerCase() || "";
+
+            return (
+              title.includes(query) ||
+              description.includes(query) ||
+              promoCode.includes(query)
+            );
+          });
+          setFilteredPromos(filtered);
+        } else {
+          setFilteredPromos(updatedPromos);
+        }
+
         toast.success("Promo created successfully");
       }
       setIsFormOpen(false);
@@ -129,6 +256,39 @@ export default function AdminPromos() {
       setFormLoading(false);
     }
   };
+
+  // Retry fetching promos
+  const retryFetchPromos = async () => {
+    if (isAuthenticated && user?.role === "admin") {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const response = await promoService.getAll();
+        const promosData = response.data.data || [];
+        setPromos(promosData);
+        setFilteredPromos(promosData);
+        toast.success("Promos loaded successfully");
+      } catch (err) {
+        setError("Failed to load promos. Please try again.");
+        console.error("Error retrying promos fetch:", err);
+        toast.error("Failed to load promos. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Pagination logic
+  const indexOfLastPromo = currentPage * promosPerPage;
+  const indexOfFirstPromo = indexOfLastPromo - promosPerPage;
+  const currentPromos = filteredPromos.slice(
+    indexOfFirstPromo,
+    indexOfLastPromo
+  );
+  const totalPages = Math.ceil(filteredPromos.length / promosPerPage);
+
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   if (loading || isLoading) {
     return (
@@ -175,6 +335,49 @@ export default function AdminPromos() {
           </button>
         </div>
 
+        {/* Error message */}
+        {error && (
+          <div className="p-4 mb-6 text-red-700 bg-red-100 border border-red-300 rounded-lg">
+            <div className="flex items-center">
+              <svg
+                className="w-5 h-5 mr-2"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span>{error}</span>
+            </div>
+            <button
+              onClick={retryFetchPromos}
+              className="px-4 py-2 mt-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
+            <FiSearch className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
+            <input
+              type="text"
+              placeholder="Search by title, description or promo code..."
+              className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                debouncedSetSearch(e.target.value);
+              }}
+            />
+          </div>
+        </div>
+
         {/* Promo list */}
         <div className="overflow-hidden bg-white shadow-sm rounded-xl">
           <div className="overflow-x-auto">
@@ -214,7 +417,7 @@ export default function AdminPromos() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {promos.map((promo) => (
+                {currentPromos.map((promo) => (
                   <tr key={promo.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="w-12 h-12 overflow-hidden rounded-lg">
@@ -263,13 +466,15 @@ export default function AdminPromos() {
                   </tr>
                 ))}
 
-                {promos.length === 0 && (
+                {currentPromos.length === 0 && (
                   <tr>
                     <td
                       colSpan="5"
                       className="px-6 py-4 text-sm text-center text-gray-500"
                     >
-                      No promos found.
+                      {debouncedSearchQuery
+                        ? "No promos found matching your search."
+                        : "No promos found. Click 'Add Promo' to create one."}
                     </td>
                   </tr>
                 )}
@@ -277,12 +482,80 @@ export default function AdminPromos() {
             </table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center mt-6 space-x-2">
+            <button
+              onClick={() => paginate(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 rounded-md ${
+                currentPage === 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Previous
+            </button>
+
+            {/* Logic for showing limited page numbers */}
+            {Array.from({ length: totalPages }, (_, i) => {
+              const pageNumber = i + 1;
+              // Show first page, last page, current page, and pages adjacent to current page
+              if (
+                pageNumber === 1 ||
+                pageNumber === totalPages ||
+                (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)
+              ) {
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => paginate(pageNumber)}
+                    className={`px-3 py-1 rounded-md ${
+                      currentPage === pageNumber
+                        ? "bg-primary-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              }
+
+              // Show ellipsis for skipped pages
+              if (
+                (pageNumber === currentPage - 3 && pageNumber > 1) ||
+                (pageNumber === currentPage + 3 && pageNumber < totalPages)
+              ) {
+                return (
+                  <span key={pageNumber} className="px-3 py-1">
+                    ...
+                  </span>
+                );
+              }
+
+              return null;
+            })}
+
+            <button
+              onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 rounded-md ${
+                currentPage === totalPages
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Promo form modal */}
       {isFormOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="w-full max-w-3xl p-6 bg-white rounded-xl">
+          <div className="w-full max-w-3xl p-6 bg-white rounded-xl max-h-[90vh] overflow-y-auto">
             <h2 className="mb-4 text-xl font-bold text-gray-900">
               {currentPromo ? "Edit Promo" : "Add Promo"}
             </h2>

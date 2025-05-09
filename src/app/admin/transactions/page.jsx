@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -20,6 +20,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { transactionService } from "@/lib/api";
 import { toast } from "react-toastify";
+import debounce from "lodash/debounce";
 
 export default function AdminTransactions() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -29,11 +30,21 @@ export default function AdminTransactions() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [updatingTransaction, setUpdatingTransaction] = useState(null);
   const transactionsPerPage = 10;
+
+  // Debounced search function
+  const debouncedSetSearch = useCallback(
+    debounce((value) => {
+      setDebouncedSearchQuery(value);
+    }, 300),
+    []
+  );
 
   // Auth check
   useEffect(() => {
@@ -46,8 +57,15 @@ export default function AdminTransactions() {
   useEffect(() => {
     const fetchTransactions = async () => {
       try {
+        setIsLoading(true);
+        setError(null);
+
         const response = await transactionService.getAllTransactions();
         console.log("Admin transactions data:", response.data);
+
+        if (!response.data || !response.data.data) {
+          throw new Error("Invalid response format from server");
+        }
 
         // Process transactions to ensure they have valid amounts
         const processedTransactions = (response.data.data || []).map(
@@ -80,7 +98,10 @@ export default function AdminTransactions() {
         setFilteredTransactions(processedTransactions);
       } catch (err) {
         console.error("Error fetching transactions:", err);
-        setError("Failed to load transactions. Please try again later.");
+        setError(
+          `Failed to load transactions: ${err.message || "Unknown error"}`
+        );
+        toast.error("Failed to load transactions. Please try again later.");
       } finally {
         setIsLoading(false);
       }
@@ -93,32 +114,40 @@ export default function AdminTransactions() {
 
   // Filter transactions when search or status filter changes
   useEffect(() => {
-    const filtered = transactions.filter((transaction) => {
-      // Status filter
-      if (statusFilter !== "all" && transaction.status !== statusFilter) {
-        return false;
-      }
+    // Create a function to filter transactions based on filters
+    const filterTransactions = () => {
+      return transactions.filter((transaction) => {
+        // Status filter
+        if (statusFilter !== "all" && transaction.status !== statusFilter) {
+          return false;
+        }
 
-      // Search query filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const id = transaction.id?.toLowerCase() || "";
-        const userName = transaction.user?.name?.toLowerCase() || "";
-        const userEmail = transaction.user?.email?.toLowerCase() || "";
+        // Search query filter - only process if there's a search query
+        if (debouncedSearchQuery) {
+          const query = debouncedSearchQuery.toLowerCase();
 
-        return (
-          id.includes(query) ||
-          userName.includes(query) ||
-          userEmail.includes(query)
-        );
-      }
+          // Early return if ID matches (most specific)
+          const id = transaction.id?.toLowerCase() || "";
+          if (id.includes(query)) return true;
 
-      return true;
-    });
+          // Then check user name and email
+          const userName = transaction.user?.name?.toLowerCase() || "";
+          const userEmail = transaction.user?.email?.toLowerCase() || "";
 
+          return userName.includes(query) || userEmail.includes(query);
+        }
+
+        return true;
+      });
+    };
+
+    // Apply the filters
+    const filtered = filterTransactions();
     setFilteredTransactions(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
-  }, [searchQuery, statusFilter, transactions]);
+
+    // Always reset to first page when filters change
+    setCurrentPage(1);
+  }, [debouncedSearchQuery, statusFilter, transactions]);
 
   // Pagination
   const indexOfLastTransaction = currentPage * transactionsPerPage;
@@ -217,6 +246,7 @@ export default function AdminTransactions() {
 
   // Handle status update
   const handleUpdateStatus = async (id, status) => {
+    setUpdatingTransaction(id);
     try {
       await transactionService.updateStatus(id, { status });
 
@@ -238,7 +268,12 @@ export default function AdminTransactions() {
       toast.success(`Transaction status updated to ${status}`);
     } catch (error) {
       console.error("Error updating transaction status:", error);
-      toast.error("Failed to update transaction status");
+      toast.error(
+        "Failed to update transaction status: " +
+          (error.message || "Unknown error")
+      );
+    } finally {
+      setUpdatingTransaction(null);
     }
   };
 
@@ -246,6 +281,55 @@ export default function AdminTransactions() {
   const viewTransactionDetails = (transaction) => {
     setSelectedTransaction(transaction);
     setIsModalOpen(true);
+  };
+
+  // Retry fetching transactions
+  const retryFetchTransactions = async () => {
+    if (isAuthenticated && user?.role === "admin") {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await transactionService.getAllTransactions();
+
+        const processedTransactions = (response.data.data || []).map(
+          (transaction) => {
+            // If amount is missing or zero, calculate from cart items
+            if (!transaction.amount || transaction.amount === 0) {
+              if (transaction.cart && transaction.cart.length > 0) {
+                let calculatedTotal = 0;
+
+                transaction.cart.forEach((item) => {
+                  if (item.activity) {
+                    const price =
+                      item.activity.price_discount || item.activity.price || 0;
+                    const quantity = item.quantity || 1;
+                    calculatedTotal += parseInt(price) * parseInt(quantity);
+                  }
+                });
+
+                if (calculatedTotal > 0) {
+                  transaction.amount = calculatedTotal;
+                }
+              }
+            }
+
+            return transaction;
+          }
+        );
+
+        setTransactions(processedTransactions);
+        setFilteredTransactions(processedTransactions);
+        toast.success("Transactions loaded successfully");
+      } catch (err) {
+        console.error("Error retrying transaction fetch:", err);
+        setError(
+          `Failed to load transactions: ${err.message || "Unknown error"}`
+        );
+        toast.error("Failed to load transactions. Please try again later.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
   };
 
   if (loading || isLoading) {
@@ -274,6 +358,22 @@ export default function AdminTransactions() {
           Manage Transactions
         </h1>
 
+        {/* Error message */}
+        {error && (
+          <div className="p-4 mb-6 text-red-700 bg-red-100 border border-red-300 rounded-lg">
+            <div className="flex items-center">
+              <FiXCircle className="mr-2" />
+              <span>{error}</span>
+            </div>
+            <button
+              onClick={retryFetchTransactions}
+              className="px-4 py-2 mt-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
+            >
+              Try Again
+            </button>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="flex flex-col mb-6 space-y-4 md:space-y-0 md:space-x-4 md:flex-row md:items-center">
           <div className="relative flex-grow">
@@ -283,7 +383,10 @@ export default function AdminTransactions() {
               placeholder="Search by ID or customer..."
               className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                debouncedSetSearch(e.target.value);
+              }}
             />
           </div>
 
@@ -425,19 +528,41 @@ export default function AdminTransactions() {
                                 onClick={() =>
                                   handleUpdateStatus(transaction.id, "success")
                                 }
-                                className="p-1 text-green-600 transition-colors rounded-md hover:bg-green-50"
+                                disabled={
+                                  updatingTransaction === transaction.id
+                                }
+                                className={`p-1 text-green-600 transition-colors rounded-md ${
+                                  updatingTransaction === transaction.id
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : "hover:bg-green-50"
+                                }`}
                                 title="Approve payment"
                               >
-                                <FiCheckCircle size={18} />
+                                {updatingTransaction === transaction.id ? (
+                                  <span className="inline-block w-4 h-4 border-2 border-green-600 rounded-full border-t-transparent animate-spin"></span>
+                                ) : (
+                                  <FiCheckCircle size={18} />
+                                )}
                               </button>
                               <button
                                 onClick={() =>
                                   handleUpdateStatus(transaction.id, "failed")
                                 }
-                                className="p-1 text-red-600 transition-colors rounded-md hover:bg-red-50"
+                                disabled={
+                                  updatingTransaction === transaction.id
+                                }
+                                className={`p-1 text-red-600 transition-colors rounded-md ${
+                                  updatingTransaction === transaction.id
+                                    ? "opacity-50 cursor-not-allowed"
+                                    : "hover:bg-red-50"
+                                }`}
                                 title="Reject payment"
                               >
-                                <FiXCircle size={18} />
+                                {updatingTransaction === transaction.id ? (
+                                  <span className="inline-block w-4 h-4 border-2 border-red-600 rounded-full border-t-transparent animate-spin"></span>
+                                ) : (
+                                  <FiXCircle size={18} />
+                                )}
                               </button>
                             </>
                           )}
@@ -462,7 +587,7 @@ export default function AdminTransactions() {
           </div>
         </div>
 
-        {/* Pagination */}
+        {/* Improved Pagination */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center mt-6 space-x-2">
             <button
@@ -476,19 +601,46 @@ export default function AdminTransactions() {
             >
               Previous
             </button>
-            {Array.from({ length: totalPages }, (_, i) => (
-              <button
-                key={i + 1}
-                onClick={() => paginate(i + 1)}
-                className={`px-3 py-1 rounded-md ${
-                  currentPage === i + 1
-                    ? "bg-primary-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
-              >
-                {i + 1}
-              </button>
-            ))}
+
+            {/* Logic for showing limited page numbers */}
+            {Array.from({ length: totalPages }, (_, i) => {
+              const pageNumber = i + 1;
+              // Show first page, last page, current page, and pages adjacent to current page
+              if (
+                pageNumber === 1 ||
+                pageNumber === totalPages ||
+                (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)
+              ) {
+                return (
+                  <button
+                    key={pageNumber}
+                    onClick={() => paginate(pageNumber)}
+                    className={`px-3 py-1 rounded-md ${
+                      currentPage === pageNumber
+                        ? "bg-primary-600 text-white"
+                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    }`}
+                  >
+                    {pageNumber}
+                  </button>
+                );
+              }
+
+              // Show ellipsis for skipped pages
+              if (
+                (pageNumber === currentPage - 3 && pageNumber > 1) ||
+                (pageNumber === currentPage + 3 && pageNumber < totalPages)
+              ) {
+                return (
+                  <span key={pageNumber} className="px-3 py-1">
+                    ...
+                  </span>
+                );
+              }
+
+              return null;
+            })}
+
             <button
               onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
@@ -727,19 +879,47 @@ export default function AdminTransactions() {
                   onClick={() =>
                     handleUpdateStatus(selectedTransaction.id, "failed")
                   }
-                  className="px-4 py-2 text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700"
+                  disabled={updatingTransaction === selectedTransaction.id}
+                  className={`px-4 py-2 text-white transition-colors rounded-lg ${
+                    updatingTransaction === selectedTransaction.id
+                      ? "bg-red-400 cursor-not-allowed"
+                      : "bg-red-600 hover:bg-red-700"
+                  }`}
                 >
-                  <FiXCircle className="inline-block mr-2" />
-                  Reject Payment
+                  {updatingTransaction === selectedTransaction.id ? (
+                    <>
+                      <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <FiXCircle className="inline-block mr-2" />
+                      Reject Payment
+                    </>
+                  )}
                 </button>
                 <button
                   onClick={() =>
                     handleUpdateStatus(selectedTransaction.id, "success")
                   }
-                  className="px-4 py-2 text-white transition-colors bg-green-600 rounded-lg hover:bg-green-700"
+                  disabled={updatingTransaction === selectedTransaction.id}
+                  className={`px-4 py-2 text-white transition-colors rounded-lg ${
+                    updatingTransaction === selectedTransaction.id
+                      ? "bg-green-400 cursor-not-allowed"
+                      : "bg-green-600 hover:bg-green-700"
+                  }`}
                 >
-                  <FiCheckCircle className="inline-block mr-2" />
-                  Approve Payment
+                  {updatingTransaction === selectedTransaction.id ? (
+                    <>
+                      <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <FiCheckCircle className="inline-block mr-2" />
+                      Approve Payment
+                    </>
+                  )}
                 </button>
               </div>
             )}
