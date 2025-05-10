@@ -14,6 +14,9 @@ import {
   FiGift,
   FiStar,
   FiAward,
+  FiX,
+  FiInfo,
+  FiAlertCircle,
 } from "react-icons/fi";
 
 export default function Newsletter() {
@@ -22,6 +25,9 @@ export default function Newsletter() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [error, setError] = useState("");
   const [focused, setFocused] = useState(false);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationType, setNotificationType] = useState("success"); // success, error, info
+  const [notificationMessage, setNotificationMessage] = useState("");
 
   const containerRef = useRef(null);
   const isInView = useInView(containerRef, { once: true, amount: 0.2 });
@@ -32,12 +38,25 @@ export default function Newsletter() {
     controls.start("visible");
   }
 
+  // Show notification helper
+  const showNotif = (type, message) => {
+    setNotificationType(type);
+    setNotificationMessage(message);
+    setShowNotification(true);
+
+    // Auto hide after 5 seconds
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 5000);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
 
     // Validate email
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
       setError("Please enter a valid email address");
+      showNotif("error", "Please enter a valid email address");
       return;
     }
 
@@ -49,6 +68,7 @@ export default function Newsletter() {
       setIsSubmitting(false);
       setIsSubscribed(true);
       setEmail("");
+      showNotif("success", "Thanks for subscribing! Check your inbox soon.");
     }, 1500);
   };
 
@@ -78,7 +98,7 @@ export default function Newsletter() {
     },
   };
 
-  // Success animation
+  // Success animation - fixed to use only 2 keyframes for spring
   const successVariants = {
     hidden: { opacity: 0, scale: 0.8 },
     visible: {
@@ -110,6 +130,7 @@ export default function Newsletter() {
         duration: 2,
         repeat: Infinity,
         repeatType: "reverse",
+        ease: "easeInOut", // Using easeInOut instead of spring for this animation
       },
     },
   };
@@ -126,6 +147,52 @@ export default function Newsletter() {
     },
   };
 
+  // Notification variants
+  const notificationVariants = {
+    hidden: {
+      opacity: 0,
+      y: -50,
+      x: "-50%",
+    },
+    visible: {
+      opacity: 1,
+      y: 0,
+      x: "-50%",
+      transition: {
+        type: "spring",
+        damping: 20,
+        stiffness: 300,
+      },
+    },
+    exit: {
+      opacity: 0,
+      y: -20,
+      x: "-50%",
+    },
+  };
+
+  // Colors for notification types
+  const notificationColors = {
+    success: {
+      bg: "bg-green-50",
+      border: "border-green-500",
+      text: "text-green-800",
+      icon: <FiCheckCircle className="w-5 h-5 text-green-500" />,
+    },
+    error: {
+      bg: "bg-red-50",
+      border: "border-red-500",
+      text: "text-red-800",
+      icon: <FiAlertCircle className="w-5 h-5 text-red-500" />,
+    },
+    info: {
+      bg: "bg-blue-50",
+      border: "border-blue-500",
+      text: "text-blue-800",
+      icon: <FiInfo className="w-5 h-5 text-blue-500" />,
+    },
+  };
+
   return (
     <motion.div
       className="relative py-16 overflow-hidden"
@@ -134,6 +201,36 @@ export default function Newsletter() {
       animate={controls}
       variants={containerVariants}
     >
+      {/* Notification toast */}
+      <AnimatePresence>
+        {showNotification && (
+          <motion.div
+            className={`fixed top-6 left-1/2 z-50 flex items-center px-4 py-3 border rounded-lg shadow-lg ${notificationColors[notificationType].bg} ${notificationColors[notificationType].border}`}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={notificationVariants}
+          >
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                {notificationColors[notificationType].icon}
+              </div>
+              <div
+                className={`ml-3 ${notificationColors[notificationType].text} font-medium`}
+              >
+                {notificationMessage}
+              </div>
+            </div>
+            <button
+              className="ml-4 text-gray-400 hover:text-gray-500"
+              onClick={() => setShowNotification(false)}
+            >
+              <FiX className="w-4 h-4" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Background decorations */}
       <motion.div
         className="absolute inset-0 pointer-events-none -z-10"
@@ -209,10 +306,7 @@ export default function Newsletter() {
               >
                 <motion.div
                   initial={{ scale: 0 }}
-                  animate={{
-                    scale: [0, 1.2, 1],
-                    rotate: [0, 10, 0],
-                  }}
+                  animate={{ scale: 1 }} // Fixed: using only 2 keyframes for spring
                   transition={{ type: "spring", duration: 0.5, delay: 0.2 }}
                   className="relative"
                 >
@@ -412,10 +506,7 @@ export default function Newsletter() {
                     variants={itemVariants}
                   >
                     By subscribing, you agree to our{" "}
-                    <a
-                      href="/privacy"
-                      className="text-primary-600 hover:underline"
-                    >
+                    <a href="#" className="text-primary-600 hover:underline">
                       Privacy Policy
                     </a>{" "}
                     and consent to receive travel-related emails.

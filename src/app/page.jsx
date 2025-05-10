@@ -207,14 +207,6 @@ export default function HomePage() {
           variants={itemVariants}
           className="relative py-12 overflow-hidden bg-white"
         >
-          {/* Subtle dot pattern */}
-          <div
-            className="absolute inset-0 opacity-50 bg-gray-50"
-            style={{
-              backgroundImage: "radial-gradient(#E5E7EB 1px, transparent 1px)",
-              backgroundSize: "24px 24px",
-            }}
-          ></div>
           <BannerSlider banners={banners} />
         </motion.section>
       )}
@@ -225,23 +217,13 @@ export default function HomePage() {
           variants={itemVariants}
           className="relative py-20 bg-gray-50"
         >
-          {/* Subtle diagonal line pattern */}
-          <div
-            className="absolute inset-0 opacity-25"
-            style={{
-              backgroundImage:
-                "repeating-linear-gradient(45deg, #E5E7EB, #E5E7EB 1px, transparent 1px, transparent 10px)",
-              backgroundSize: "14px 14px",
-            }}
-          ></div>
-
           <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
             <CategoryShowcase categories={categories} />
           </div>
         </motion.section>
       )}
 
-      {/* Popular Activities - Pure white with subtle shadow separators */}
+      {/* Popular Activities */}
       {activities.length > 0 && (
         <motion.section
           variants={itemVariants}
@@ -271,7 +253,6 @@ export default function HomePage() {
             backgroundSize: "60px 60px",
           }}
         ></div>
-
         <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
           <FeaturedDestinations activities={activities.slice(0, 3)} />
         </div>
@@ -283,10 +264,6 @@ export default function HomePage() {
           variants={itemVariants}
           className="relative py-20 bg-white"
         >
-          {/* Border decoration */}
-          <div className="absolute inset-0 border-t border-b border-gray-100"></div>
-          <div className="absolute inset-0 m-4 border border-gray-100 rounded-2xl"></div>
-
           <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
             <PromoSection promos={promos} />
           </div>
@@ -299,16 +276,13 @@ export default function HomePage() {
         className="relative py-20 bg-gray-50"
       >
         {/* Large quote marks decoration */}
-        <div className="absolute opacity-5 text-gray-400 text-[250px] font-serif top-10 left-10">
+        <div className="absolute opacity-5 text-black text-[250px] font-serif top-10 left-10">
           "
         </div>
-        <div className="absolute opacity-5 text-gray-400 text-[250px] font-serif bottom-10 right-10">
+        <div className="absolute opacity-5 text-black text-[250px] font-serif bottom-10 right-10">
           "
         </div>
-
-        <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
-          <Testimonials />
-        </div>
+        <Testimonials />
       </motion.section>
 
       {/* Newsletter - White with subtle shadow */}
@@ -329,9 +303,6 @@ export default function HomePage() {
         variants={itemVariants}
         className="relative py-20 bg-gradient-to-r from-gray-50 via-white to-gray-50"
       >
-        {/* Elegant border decoration */}
-        <div className="absolute inset-0 m-12 border border-gray-200 opacity-50 rounded-3xl"></div>
-
         <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
           <CallToAction />
         </div>

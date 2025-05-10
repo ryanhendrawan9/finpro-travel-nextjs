@@ -50,7 +50,7 @@ export default function ModernHero() {
     if (date) queryParams.append("date", date);
     if (guests) queryParams.append("guests", guests);
 
-    router.push(`/search?${queryParams.toString()}`);
+    router.push(`#`);
   };
 
   // Animation variants

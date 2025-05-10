@@ -35,7 +35,7 @@ export default function RootLayout({ children }) {
     const style = document.createElement("style");
     style.innerHTML = `
       html {
-        background: linear-gradient(to bottom right, #1e3a8a, #312e81) !important;
+        background: linear-gradient(to bottom right, #1e3a8a) !important;
         height: 100% !important;
       }
       body {
@@ -60,7 +60,7 @@ export default function RootLayout({ children }) {
             dangerouslySetInnerHTML={{
               __html: `
             html {
-              background: linear-gradient(to bottom right, #1e3a8a, #312e81) !important;
+              background: linear-gradient(to bottom right, #1e3a8a) !important;
             }
             body {
               background: transparent !important;

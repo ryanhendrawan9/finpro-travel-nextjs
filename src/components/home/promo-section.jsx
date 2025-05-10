@@ -104,10 +104,29 @@ export default function PromoSection({ promos = [] }) {
     },
   };
 
-  // Generate random expiry days for each promo for demo purposes
-  const getRandomExpiryDays = (index) => {
+  // Tidak lagi menggunakan fungsi diskon
+
+  // Tetapkan nilai hari kedaluwarsa untuk setiap promo
+  const getExpiryDays = (index) => {
     const days = [3, 5, 7, 10, 14, 21];
-    return days[index % days.length] || days[0];
+    return days[index % days.length];
+  };
+
+  // Tetapkan kode promo untuk setiap promo
+  const getPromoCode = (index, promo) => {
+    if (promo.promo_code) {
+      return promo.promo_code;
+    }
+
+    const codes = [
+      "INDO2025",
+      "BALI500",
+      "LOMBOK50",
+      "FLORES25",
+      "JAVA100",
+      "SUMATRA30",
+    ];
+    return codes[index % codes.length];
   };
 
   if (promos.length === 0) {
@@ -222,12 +241,7 @@ export default function PromoSection({ promos = [] }) {
                           "/images/placeholders/promo-placeholder.jpg";
                       }}
                     />
-                    <motion.div
-                      className="absolute px-3 py-1.5 text-sm font-bold text-white rounded-full top-4 right-4 bg-gradient-to-r from-yellow-500 to-yellow-600 shadow-md"
-                      animate={controls}
-                    >
-                      {Math.floor(Math.random() * 70) + 10}% OFF
-                    </motion.div>
+                    {/* Badge diskon telah dihapus */}
 
                     {/* New badge for certain promos */}
                     {index % 3 === 0 && (
@@ -281,7 +295,7 @@ export default function PromoSection({ promos = [] }) {
                     {/* Timer section */}
                     <div className="flex items-center mb-4 text-xs text-gray-500">
                       <FiClock className="mr-1" size={14} />
-                      <span>Expires in {getRandomExpiryDays(index)} days</span>
+                      <span>Expires in {getExpiryDays(index)} days</span>
                     </div>
 
                     <div className="flex items-center justify-between mt-auto">
@@ -290,8 +304,7 @@ export default function PromoSection({ promos = [] }) {
                         whileHover={{ scale: 1.05 }}
                       >
                         <FiTag className="mr-1" size={14} />
-                        {promo.promo_code ||
-                          `INDO${Math.floor(Math.random() * 1000)}`}
+                        {getPromoCode(index, promo)}
                       </motion.div>
 
                       <motion.span

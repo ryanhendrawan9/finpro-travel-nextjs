@@ -11,8 +11,6 @@ import {
   FiArrowRight,
 } from "react-icons/fi";
 import Link from "next/link";
-// Remove Next Image import to avoid domain config issues
-// import Image from "next/image";
 
 export default function EnhancedBannerSlider({ banners }) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -171,7 +169,8 @@ export default function EnhancedBannerSlider({ banners }) {
         ></div>
       </div>
 
-      <div className="relative aspect-[21/9] md:aspect-[21/7] w-full">
+      {/* Mengubah aspect ratio untuk tampilan mobile */}
+      <div className="relative aspect-[16/9] sm:aspect-[21/9] md:aspect-[21/7] w-full">
         <AnimatePresence initial={false} custom={direction} mode="popLayout">
           <motion.div
             key={currentIndex}
@@ -201,14 +200,14 @@ export default function EnhancedBannerSlider({ banners }) {
                   loading="eager"
                 />
 
-                {/* Modern gradient overlay */}
-                <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent"></div>
+                {/* Enhanced gradient overlay for better text visibility */}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/70 to-black/30 sm:from-black/80 sm:via-black/50 sm:to-transparent"></div>
               </div>
 
-              {/* Enhanced content */}
+              {/* Enhanced content with improved mobile responsiveness */}
               <div className="absolute inset-0 flex items-center">
                 <motion.div
-                  className="max-w-lg pl-8 space-y-6 md:pl-16 lg:pl-24"
+                  className="w-full max-w-lg px-4 space-y-2 sm:space-y-3 md:space-y-6 sm:pl-8 md:pl-16 lg:pl-24"
                   variants={contentVariants}
                   initial="hidden"
                   animate="visible"
@@ -216,76 +215,78 @@ export default function EnhancedBannerSlider({ banners }) {
                   {/* Featured badge */}
                   {enhancedBanners[currentIndex].featured && (
                     <motion.div variants={itemVariants}>
-                      <span className="inline-block px-3 py-1 mb-4 text-xs font-medium text-white bg-blue-600 rounded-full">
+                      <span className="inline-block px-2 py-0.5 sm:px-3 sm:py-1 mb-1 sm:mb-2 md:mb-4 text-xs font-medium text-white bg-blue-600 rounded-full">
                         Featured
                       </span>
                     </motion.div>
                   )}
 
-                  {/* Banner title */}
+                  {/* Banner title with improved responsive sizing */}
                   <motion.h2
                     variants={itemVariants}
-                    className="mb-2 text-3xl font-bold text-white md:text-4xl lg:text-5xl font-heading text-shadow-lg"
+                    className="mb-1 text-xl font-bold text-white sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-heading text-shadow-lg"
                   >
                     {enhancedBanners[currentIndex].name}
                   </motion.h2>
 
-                  {/* Location and duration */}
+                  {/* Location and duration - stacked on mobile */}
                   <motion.div
                     variants={itemVariants}
-                    className="flex flex-wrap items-center gap-4 mb-2"
+                    className="flex flex-col items-start gap-1 mb-1 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 md:gap-4 sm:mb-2"
                   >
-                    <div className="flex items-center text-white/90">
-                      <FiMapPin className="mr-2 text-blue-400" />
+                    <div className="flex items-center text-xs text-white/90 sm:text-sm md:text-base">
+                      <FiMapPin className="mr-1 text-blue-400 sm:mr-2" />
                       <span>{enhancedBanners[currentIndex].location}</span>
                     </div>
-                    <div className="flex items-center text-white/90">
-                      <FiClock className="mr-2 text-blue-400" />
+                    <div className="flex items-center text-xs text-white/90 sm:text-sm md:text-base">
+                      <FiClock className="mr-1 text-blue-400 sm:mr-2" />
                       <span>{enhancedBanners[currentIndex].duration}</span>
                     </div>
-                    <div className="flex items-center text-white/90">
+                    <div className="flex items-center text-xs text-white/90 sm:text-sm md:text-base">
                       <FiStar
-                        className="mr-2 text-yellow-400"
+                        className="mr-1 text-yellow-400 sm:mr-2"
                         fill="currentColor"
                       />
                       <span>
                         {enhancedBanners[currentIndex].rating} (
-                        {enhancedBanners[currentIndex].reviews} reviews)
+                        {enhancedBanners[currentIndex].reviews})
                       </span>
                     </div>
                   </motion.div>
 
-                  {/* Description */}
+                  {/* Description - hidden on smallest screens */}
                   <motion.p
                     variants={itemVariants}
-                    className="hidden mb-3 text-lg text-white/90 md:block"
+                    className="hidden mb-1 text-sm sm:block sm:mb-2 md:mb-3 md:text-base lg:text-lg text-white/90"
                   >
                     Discover amazing destinations and unforgettable experiences
                   </motion.p>
 
-                  {/* Price with discount */}
-                  <motion.div variants={itemVariants} className="mb-4">
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl font-bold text-white">
+                  {/* Price with discount - responsive font sizes */}
+                  <motion.div variants={itemVariants} className="mb-2 md:mb-4">
+                    <div className="flex items-center gap-2 md:gap-3">
+                      <span className="text-lg font-bold text-white sm:text-xl md:text-2xl lg:text-3xl">
                         {enhancedBanners[currentIndex].discount}
                       </span>
                       {enhancedBanners[currentIndex].price && (
-                        <span className="text-lg line-through text-white/70">
+                        <span className="text-sm line-through md:text-lg text-white/70">
                           {enhancedBanners[currentIndex].price}
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-white/70">*Price per person</p>
+                    <p className="text-xs sm:text-sm text-white/70">
+                      *Price per person
+                    </p>
                   </motion.div>
 
-                  {/* Call to action */}
+                  {/* Call to action - smaller on mobile */}
                   <motion.div variants={itemVariants}>
                     <Link
                       href={`/banner/${enhancedBanners[currentIndex].id}`}
-                      className="inline-flex items-center px-6 py-3 font-medium text-white transition-all rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-700/30 group"
+                      className="inline-flex items-center px-4 py-2 sm:px-5 sm:py-2.5 md:px-6 md:py-3 text-sm sm:text-base font-medium text-white transition-all rounded-lg sm:rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-700/30 group"
                     >
                       <span>Explore Now</span>
-                      <FiArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
+                      <FiArrowRight className="ml-1.5 sm:ml-2 transition-transform group-hover:translate-x-1" />
                     </Link>
                   </motion.div>
                 </motion.div>
@@ -295,35 +296,35 @@ export default function EnhancedBannerSlider({ banners }) {
         </AnimatePresence>
       </div>
 
-      {/* Enhanced controls with hover animations */}
+      {/* Enhanced controls with hover animations - smaller on mobile */}
       <motion.button
-        className="absolute p-3 text-white transition-all -translate-y-1/2 rounded-full left-4 top-1/2 bg-black/20 hover:bg-blue-600 backdrop-blur-sm hover:scale-110"
+        className="absolute p-1 text-white transition-all -translate-y-1/2 rounded-full sm:p-2 md:p-3 left-2 sm:left-4 top-1/2 bg-black/20 hover:bg-blue-600 backdrop-blur-sm hover:scale-110"
         onClick={prevSlide}
         aria-label="Previous banner"
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
       >
-        <FiChevronLeft size={24} />
+        <FiChevronLeft size={16} className="sm:w-5 sm:h-5 md:w-6 md:h-6" />
       </motion.button>
       <motion.button
-        className="absolute p-3 text-white transition-all -translate-y-1/2 rounded-full right-4 top-1/2 bg-black/20 hover:bg-blue-600 backdrop-blur-sm hover:scale-110"
+        className="absolute p-1 text-white transition-all -translate-y-1/2 rounded-full sm:p-2 md:p-3 right-2 sm:right-4 top-1/2 bg-black/20 hover:bg-blue-600 backdrop-blur-sm hover:scale-110"
         onClick={nextSlide}
         aria-label="Next banner"
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
       >
-        <FiChevronRight size={24} />
+        <FiChevronRight size={16} className="sm:w-5 sm:h-5 md:w-6 md:h-6" />
       </motion.button>
 
       {/* Enhanced indicators with animations */}
-      <div className="absolute flex items-center -translate-x-1/2 space-x-2.5 bottom-6 left-1/2">
+      <div className="absolute flex items-center -translate-x-1/2 space-x-1.5 sm:space-x-2.5 bottom-2 sm:bottom-4 md:bottom-6 left-1/2">
         {enhancedBanners.map((_, index) => (
           <motion.button
             key={index}
-            className={`h-2.5 rounded-full transition-all duration-300 ${
+            className={`h-1.5 sm:h-2 md:h-2.5 rounded-full transition-all duration-300 ${
               index === currentIndex
-                ? "bg-blue-500 w-8"
-                : "bg-white/50 w-2.5 hover:bg-white/80"
+                ? "bg-blue-500 w-5 sm:w-6 md:w-8"
+                : "bg-white/50 w-1.5 sm:w-2 md:w-2.5 hover:bg-white/80"
             }`}
             onClick={() => gotoSlide(index)}
             aria-label={`Go to banner ${index + 1}`}
@@ -334,8 +335,8 @@ export default function EnhancedBannerSlider({ banners }) {
         ))}
       </div>
 
-      {/* Banner counter */}
-      <div className="absolute px-3 py-1 text-xs font-medium text-white rounded-full top-4 right-4 bg-black/30 backdrop-blur-sm">
+      {/* Banner counter - smaller on mobile */}
+      <div className="absolute px-2 py-0.5 sm:px-3 sm:py-1 text-xs font-medium text-white rounded-full top-2 sm:top-4 right-2 sm:right-4 bg-black/30 backdrop-blur-sm">
         {currentIndex + 1} / {enhancedBanners.length}
       </div>
     </div>
