@@ -113,12 +113,6 @@ export default function EnhancedCategoryShowcase({ categories }) {
     },
   };
 
-  // Add sample activity counts if not provided
-  const enhancedCategories = categories.map((category) => ({
-    ...category,
-    activityCount: category.activityCount || Math.floor(Math.random() * 20) + 5,
-  }));
-
   return (
     <motion.div
       className="relative py-16"
@@ -197,7 +191,7 @@ export default function EnhancedCategoryShowcase({ categories }) {
         style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         onScroll={handleScroll}
       >
-        {enhancedCategories.map((category, index) => {
+        {categories.map((category, index) => {
           const CategoryIcon = getCategoryIcon(category.name);
 
           return (
@@ -242,11 +236,6 @@ export default function EnhancedCategoryShowcase({ categories }) {
                       <h3 className="mb-1 text-2xl font-bold text-white">
                         {category.name}
                       </h3>
-                      <div className="flex items-center text-sm text-white/90">
-                        <span>
-                          {category.activityCount} activities available
-                        </span>
-                      </div>
                     </div>
 
                     {/* Category icon badge */}

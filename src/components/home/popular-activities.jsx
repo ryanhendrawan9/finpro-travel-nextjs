@@ -17,6 +17,7 @@ export default function PopularActivities({ activities = [] }) {
   const [startIndex, setStartIndex] = useState(0);
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [filteredActivities, setFilteredActivities] = useState(activities);
+  const [availableFilters, setAvailableFilters] = useState([]);
   const containerRef = useRef(null);
   const isInView = useInView(containerRef, { once: true, amount: 0.2 });
   const itemsPerPage = 3;
@@ -28,14 +29,45 @@ export default function PopularActivities({ activities = [] }) {
   const canScrollRight = endIndex < filteredActivities.length;
   const [transition, setTransition] = useState(true);
 
-  // Filter functions
+  // Filter options with full details
   const filterOptions = [
-    { id: "all", label: "All Activities" },
-    { id: "trending", label: "Trending" },
-    { id: "top-rated", label: "Top Rated" },
-    { id: "new", label: "New" },
+    { id: "all", label: "All Activities", icon: null },
+    {
+      id: "trending",
+      label: "Trending",
+      icon: <FiTrendingUp className="inline-block mr-1" />,
+    },
+    {
+      id: "new",
+      label: "New",
+      icon: <FiClock className="inline-block mr-1" />,
+    },
   ];
 
+  // Determine which filters have content on initial load
+  useEffect(() => {
+    const filters = [
+      { id: "all", label: "All Activities", count: activities.length },
+    ];
+
+    // Check if there are trending activities
+    const trendingCount = activities.filter(
+      (activity) => activity.trending || activity.bookings > 50
+    ).length;
+    if (trendingCount > 0) {
+      filters.push({ id: "trending", label: "Trending", count: trendingCount });
+    }
+
+    // Check if there are new activities
+    const newCount = activities.filter((activity) => activity.isNew).length;
+    if (newCount > 0) {
+      filters.push({ id: "new", label: "New", count: newCount });
+    }
+
+    setAvailableFilters(filters);
+  }, [activities]);
+
+  // Apply filter when selection changes
   useEffect(() => {
     // Filter the activities based on the selected filter
     if (selectedFilter === "all") {
@@ -127,6 +159,9 @@ export default function PopularActivities({ activities = [] }) {
   const pageCount = Math.ceil(filteredActivities.length / itemsPerPage);
   const currentPage = Math.floor(startIndex / itemsPerPage);
 
+  // Find the current filter details to display icon
+  const currentFilter = filterOptions.find((f) => f.id === selectedFilter);
+
   return (
     <motion.div
       ref={containerRef}
@@ -153,9 +188,9 @@ export default function PopularActivities({ activities = [] }) {
           </p>
         </div>
 
-        {/* Filter controls for desktop */}
+        {/* Filter controls for desktop - ONLY SHOWING AVAILABLE FILTERS */}
         <div className="items-center hidden space-x-2 md:flex">
-          {filterOptions.map((filter) => (
+          {availableFilters.map((filter) => (
             <button
               key={filter.id}
               onClick={() => setSelectedFilter(filter.id)}
@@ -166,12 +201,17 @@ export default function PopularActivities({ activities = [] }) {
               }`}
             >
               {filter.label}
+              {filter.id !== "all" && (
+                <span className="ml-1.5 px-1.5 py-0.5 text-xs rounded-full bg-white/20">
+                  {filter.count}
+                </span>
+              )}
             </button>
           ))}
         </div>
       </motion.div>
 
-      {/* Filter dropdown for mobile */}
+      {/* Filter dropdown for mobile - ONLY SHOWING AVAILABLE FILTERS */}
       <motion.div
         className="flex mx-4 mb-6 md:hidden"
         variants={sectionHeaderVariants}
@@ -188,15 +228,15 @@ export default function PopularActivities({ activities = [] }) {
             backgroundSize: "1.5em 1.5em",
           }}
         >
-          {filterOptions.map((filter) => (
+          {availableFilters.map((filter) => (
             <option key={filter.id} value={filter.id}>
-              {filter.label}
+              {filter.label} {filter.id !== "all" ? `(${filter.count})` : ""}
             </option>
           ))}
         </select>
       </motion.div>
 
-      {/* Featured label */}
+      {/* Featured label with current filter info */}
       {selectedFilter !== "all" && (
         <motion.div
           className="flex items-center px-4 mb-6"
@@ -240,70 +280,87 @@ export default function PopularActivities({ activities = [] }) {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: transition ? 0.4 : 0 }}
         >
-          {filteredActivities
-            .slice(startIndex, endIndex)
-            .map((activity, index) => (
-              <ActivityCard
-                key={activity.id}
-                activity={activity}
-                index={index}
-              />
-            ))}
+          {filteredActivities.length > 0 ? (
+            filteredActivities
+              .slice(startIndex, endIndex)
+              .map((activity, index) => (
+                <ActivityCard
+                  key={activity.id}
+                  activity={activity}
+                  index={index}
+                />
+              ))
+          ) : (
+            <div className="py-12 text-center text-gray-500 col-span-full">
+              <FiStar className="inline-block mb-4 text-4xl text-gray-300" />
+              <p className="text-xl font-medium text-gray-700">
+                No activities found
+              </p>
+              <button
+                onClick={() => setSelectedFilter("all")}
+                className="px-6 py-2 mt-4 text-blue-600 rounded-full bg-blue-50 hover:bg-blue-100"
+              >
+                View all activities
+              </button>
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
 
-      {/* Navigation controls */}
-      <div className="flex items-center justify-between px-4 mt-12">
-        {/* Page indicators */}
-        <div className="flex items-center space-x-2">
-          {Array.from({ length: pageCount }).map((_, i) => (
-            <motion.button
-              key={i}
-              className={`h-2.5 rounded-full transition-all duration-300 ${
-                i === currentPage
-                  ? "bg-blue-600 w-8"
-                  : "bg-gray-300 w-2.5 hover:bg-white/80"
-              }`}
-              variants={pageIndicatorVariants}
-              initial="initial"
-              animate={i === currentPage ? "active" : "initial"}
-              onClick={() => setStartIndex(i * itemsPerPage)}
-            />
-          ))}
-        </div>
+      {/* Only show navigation controls when there are multiple pages */}
+      {filteredActivities.length > itemsPerPage && (
+        <div className="flex items-center justify-between px-4 mt-12">
+          {/* Page indicators */}
+          <div className="flex items-center space-x-2">
+            {Array.from({ length: pageCount }).map((_, i) => (
+              <motion.button
+                key={i}
+                className={`h-2.5 rounded-full transition-all duration-300 ${
+                  i === currentPage
+                    ? "bg-blue-600 w-8"
+                    : "bg-gray-300 w-2.5 hover:bg-white/80"
+                }`}
+                variants={pageIndicatorVariants}
+                initial="initial"
+                animate={i === currentPage ? "active" : "initial"}
+                onClick={() => setStartIndex(i * itemsPerPage)}
+              />
+            ))}
+          </div>
 
-        {/* Navigation buttons */}
-        <div className="flex items-center space-x-3">
-          <motion.button
-            onClick={scrollLeft}
-            className={`p-3 rounded-full border transition-all ${
-              canScrollLeft
-                ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-blue-600 hover:border-blue-200"
-                : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
-            }`}
-            disabled={!canScrollLeft}
-            whileHover={canScrollLeft ? { scale: 1.1 } : {}}
-            whileTap={canScrollLeft ? { scale: 0.95 } : {}}
-            aria-label="Previous page"
-          >
-            <FiChevronLeft size={20} />
-          </motion.button>
-          <motion.button
-            onClick={scrollRight}
-            className={`p-3 rounded-full border transition-all ${
-              canScrollRight
-                ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-blue-600 hover:border-blue-200"
-                : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
-            }`}
-            disabled={!canScrollRight}
-            whileHover={canScrollRight ? { scale: 1.1 } : {}}
-            whileTap={canScrollRight ? { scale: 0.95 } : {}}
-            aria-label="Next page"
-          >
-            <FiChevronRight size={20} />
-          </motion.button>
+          {/* Navigation buttons */}
+          <div className="flex items-center space-x-3">
+            <motion.button
+              onClick={scrollLeft}
+              className={`p-3 rounded-full border transition-all ${
+                canScrollLeft
+                  ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-blue-600 hover:border-blue-200"
+                  : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+              disabled={!canScrollLeft}
+              whileHover={canScrollLeft ? { scale: 1.1 } : {}}
+              whileTap={canScrollLeft ? { scale: 0.95 } : {}}
+              aria-label="Previous page"
+            >
+              <FiChevronLeft size={20} />
+            </motion.button>
+            <motion.button
+              onClick={scrollRight}
+              className={`p-3 rounded-full border transition-all ${
+                canScrollRight
+                  ? "border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:text-blue-600 hover:border-blue-200"
+                  : "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+              disabled={!canScrollRight}
+              whileHover={canScrollRight ? { scale: 1.1 } : {}}
+              whileTap={canScrollRight ? { scale: 0.95 } : {}}
+              aria-label="Next page"
+            >
+              <FiChevronRight size={20} />
+            </motion.button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* View All link */}
       <div className="mt-12 text-center">

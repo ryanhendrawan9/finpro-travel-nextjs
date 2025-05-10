@@ -207,12 +207,14 @@ export default function ModernLoadingScreen() {
 
           {/* Logo */}
           <motion.div
-            className="flex items-center justify-center w-24 h-24 bg-white rounded-full shadow-xl"
+            className="flex items-center justify-center w-24 h-24 overflow-hidden bg-white rounded-full shadow-xl"
             variants={itemVariants}
           >
-            <span className="text-2xl font-bold text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text">
-              Travel
-            </span>
+            <img
+              src="/images/logo.png"
+              alt="Logo"
+              className="object-contain w-full h-full"
+            />
           </motion.div>
         </motion.div>
 

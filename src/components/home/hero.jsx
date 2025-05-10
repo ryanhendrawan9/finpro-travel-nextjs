@@ -12,6 +12,7 @@ import {
   FiStar,
   FiAward,
   FiCompass,
+  FiCheck,
 } from "react-icons/fi";
 
 export default function ModernHero() {
@@ -92,6 +93,31 @@ export default function ModernHero() {
     },
   };
 
+  const staggerBadgeVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.4,
+      },
+    },
+  };
+
+  const badgeVariants = {
+    hidden: { opacity: 0, scale: 0.8, y: 10 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      y: 0,
+      transition: {
+        type: "spring",
+        stiffness: 250,
+        damping: 20,
+      },
+    },
+  };
+
   const backgroundImages = [
     "url('https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?auto=format&fit=crop&w=1920&q=80')",
     "url('https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1920&q=80')",
@@ -121,7 +147,7 @@ export default function ModernHero() {
       <div className="absolute inset-0 bg-black/25"></div>
 
       {/* Hero content - Added extra padding top for mobile */}
-      <div className="relative flex flex-col items-center justify-center pt-10 md:pt-0 min-h-[calc(100vh-5rem)] px-4 text-white md:px-8 lg:px-16 ">
+      <div className="relative flex flex-col items-center justify-center pt-6 md:pt-0 min-h-[calc(105vh-5rem)] px-4 text-white md:px-8 lg:px-16 ">
         <motion.h1
           className="mb-4 text-4xl font-bold tracking-tight text-center md:text-5xl lg:text-6xl xl:text-7xl font-heading text-shadow-lg"
           variants={itemVariants}
@@ -263,22 +289,45 @@ export default function ModernHero() {
           </form>
         </motion.div>
 
-        {/* Trusted by section */}
+        {/* IMPROVED: Compact Trusted By Section with better mobile responsiveness */}
         <motion.div
-          className="flex flex-col items-center mt-12 md:mt-14"
-          variants={itemVariants}
+          className="flex flex-wrap justify-center gap-2 px-2 mt-6 md:mt-8"
+          variants={staggerBadgeVariants}
         >
-          <p className="mb-4 text-sm font-medium text-white text-shadow">
-            Trusted by 3,000,000+ travelers
-          </p>
-          <div className="flex items-center space-x-1 text-yellow-400">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <FiStar key={star} fill="currentColor" />
-            ))}
-          </div>
-          <p className="mt-1 text-sm text-white text-shadow">
-            4.8 out of 5 stars
-          </p>
+          {/* Rating pill */}
+          <motion.div
+            className="flex items-center px-3 py-1.5 bg-white/15 backdrop-blur-sm rounded-full border border-white/20"
+            variants={badgeVariants}
+            whileHover={{ scale: 1.05 }}
+          >
+            <div className="flex mr-1.5 text-yellow-400">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <FiStar key={star} size={14} fill="currentColor" />
+              ))}
+            </div>
+            <span className="text-xs font-medium text-white">4.8/5</span>
+          </motion.div>
+
+          {/* Travelers count */}
+          <motion.div
+            className="flex items-center px-3 py-1.5 bg-white/15 backdrop-blur-sm rounded-full border border-white/20"
+            variants={badgeVariants}
+            whileHover={{ scale: 1.05 }}
+          >
+            <span className="text-xs font-medium text-white">
+              3M+ travelers
+            </span>
+          </motion.div>
+
+          {/* Verified badge */}
+          <motion.div
+            className="flex items-center px-3 py-1.5 bg-white/15 backdrop-blur-sm rounded-full border border-white/20"
+            variants={badgeVariants}
+            whileHover={{ scale: 1.05 }}
+          >
+            <FiCheck className="w-3.5 h-3.5 mr-1 text-green-400" />
+            <span className="text-xs font-medium text-white">Verified</span>
+          </motion.div>
         </motion.div>
       </div>
     </motion.div>

@@ -193,72 +193,148 @@ export default function HomePage() {
 
   return (
     <motion.div
-      className="min-h-screen bg-gray-50"
+      className="min-h-screen bg-white"
       initial="hidden"
       animate="visible"
       variants={containerVariants}
     >
+      {/* Hero - Full width, no container needed */}
       <Hero />
 
+      {/* Banner Slider - Clean white with subtle pattern */}
       {banners.length > 0 && (
-        <motion.section variants={itemVariants} className="py-8">
+        <motion.section
+          variants={itemVariants}
+          className="relative py-12 overflow-hidden bg-white"
+        >
+          {/* Subtle dot pattern */}
+          <div
+            className="absolute inset-0 opacity-50 bg-gray-50"
+            style={{
+              backgroundImage: "radial-gradient(#E5E7EB 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          ></div>
           <BannerSlider banners={banners} />
         </motion.section>
       )}
 
+      {/* Category Showcase - Light gray background with white cards */}
       {categories.length > 0 && (
         <motion.section
           variants={itemVariants}
-          className="px-4 py-12 bg-white md:px-8 lg:px-16"
+          className="relative py-20 bg-gray-50"
         >
-          <CategoryShowcase categories={categories} />
+          {/* Subtle diagonal line pattern */}
+          <div
+            className="absolute inset-0 opacity-25"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(45deg, #E5E7EB, #E5E7EB 1px, transparent 1px, transparent 10px)",
+              backgroundSize: "14px 14px",
+            }}
+          ></div>
+
+          <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
+            <CategoryShowcase categories={categories} />
+          </div>
         </motion.section>
       )}
 
+      {/* Popular Activities - Pure white with subtle shadow separators */}
       {activities.length > 0 && (
         <motion.section
           variants={itemVariants}
-          className="px-4 py-12 md:px-8 lg:px-16"
+          className="relative py-20 bg-white"
         >
-          <PopularActivities activities={activities.slice(0, 6)} />
+          {/* Subtle horizontal line separators */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
+          <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent"></div>
+
+          <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
+            <PopularActivities activities={activities.slice(0, 6)} />
+          </div>
         </motion.section>
       )}
 
+      {/* Featured Destinations - Light blue-gray gradient */}
       <motion.section
         variants={itemVariants}
-        className="px-4 py-12 md:px-8 lg:px-16 bg-primary-50"
+        className="relative py-20 bg-gradient-to-b from-gray-50 to-blue-50"
       >
-        <FeaturedDestinations activities={activities.slice(0, 3)} />
+        {/* Subtle circular pattern */}
+        <div
+          className="absolute inset-0 opacity-50"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 25% 25%, #E1F5FE 1%, transparent 1%), radial-gradient(circle at 75% 75%, #E1F5FE 1%, transparent 1%)",
+            backgroundSize: "60px 60px",
+          }}
+        ></div>
+
+        <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
+          <FeaturedDestinations activities={activities.slice(0, 3)} />
+        </div>
       </motion.section>
 
+      {/* Promo Section - White with thin border */}
       {promos.length > 0 && (
         <motion.section
           variants={itemVariants}
-          className="px-4 py-12 bg-white md:px-8 lg:px-16"
+          className="relative py-20 bg-white"
         >
-          <PromoSection promos={promos} />
+          {/* Border decoration */}
+          <div className="absolute inset-0 border-t border-b border-gray-100"></div>
+          <div className="absolute inset-0 m-4 border border-gray-100 rounded-2xl"></div>
+
+          <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
+            <PromoSection promos={promos} />
+          </div>
         </motion.section>
       )}
 
+      {/* Testimonials - Light gray with quote marks */}
       <motion.section
         variants={itemVariants}
-        className="px-4 py-12 md:px-8 lg:px-16 bg-secondary-50"
+        className="relative py-20 bg-gray-50"
       >
-        <Testimonials />
+        {/* Large quote marks decoration */}
+        <div className="absolute opacity-5 text-gray-400 text-[250px] font-serif top-10 left-10">
+          "
+        </div>
+        <div className="absolute opacity-5 text-gray-400 text-[250px] font-serif bottom-10 right-10">
+          "
+        </div>
+
+        <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
+          <Testimonials />
+        </div>
       </motion.section>
 
+      {/* Newsletter - White with subtle shadow */}
       <motion.section
         variants={itemVariants}
-        className="px-4 py-12 bg-white md:px-8 lg:px-16"
+        className="relative py-20 overflow-hidden bg-white shadow-sm"
       >
-        <Newsletter />
+        {/* Subtle radial gradient */}
+        <div className="absolute inset-0 bg-gradient-to-r from-gray-50 via-white to-gray-50"></div>
+
+        <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
+          <Newsletter />
+        </div>
       </motion.section>
 
+      {/* Call To Action - Light gradient with elegant border */}
       <motion.section
         variants={itemVariants}
-        className="px-4 py-16 md:px-8 lg:px-16 bg-accent-500"
+        className="relative py-20 bg-gradient-to-r from-gray-50 via-white to-gray-50"
       >
-        <CallToAction />
+        {/* Elegant border decoration */}
+        <div className="absolute inset-0 m-12 border border-gray-200 opacity-50 rounded-3xl"></div>
+
+        <div className="container relative z-10 px-4 mx-auto md:px-8 lg:px-16">
+          <CallToAction />
+        </div>
       </motion.section>
     </motion.div>
   );
