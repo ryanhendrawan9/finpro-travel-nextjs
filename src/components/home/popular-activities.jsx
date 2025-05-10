@@ -259,8 +259,10 @@ export default function PopularActivities({ activities = [] }) {
           {Array.from({ length: pageCount }).map((_, i) => (
             <motion.button
               key={i}
-              className={`h-2 rounded-full bg-${
-                i === currentPage ? "blue-600" : "gray-300"
+              className={`h-2.5 rounded-full transition-all duration-300 ${
+                i === currentPage
+                  ? "bg-blue-600 w-8"
+                  : "bg-gray-300 w-2.5 hover:bg-white/80"
               }`}
               variants={pageIndicatorVariants}
               initial="initial"
@@ -305,15 +307,12 @@ export default function PopularActivities({ activities = [] }) {
 
       {/* View All link */}
       <div className="mt-12 text-center">
-        <Link href="/activity" legacyBehavior>
-          <motion.a
-            className="inline-flex items-center px-8 py-3 font-medium text-white transition-all rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-500/30 group"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            View All Activities
-            <FiArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
-          </motion.a>
+        <Link
+          href="/activity"
+          className="inline-flex items-center px-8 py-3 font-medium text-white transition-all rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 hover:shadow-lg hover:shadow-blue-500/30 group"
+        >
+          View All Activities
+          <FiArrowRight className="ml-2 transition-transform group-hover:translate-x-1" />
         </Link>
       </div>
     </motion.div>

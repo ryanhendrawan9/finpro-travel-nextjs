@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -12,6 +12,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
+import { uploadService } from "@/lib/api"; // Import uploadService
 
 export default function ProfilePage() {
   const {
@@ -30,6 +31,7 @@ export default function ProfilePage() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
+  const fileInputRef = useRef(null); // Reference to hidden file input
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -55,6 +57,44 @@ export default function ProfilePage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Handle file selection for profile picture
+  const handleFileSelect = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setIsSubmitting(true);
+      // Create FormData for image upload
+      const formData = new FormData();
+      formData.append("image", file);
+
+      // Upload the image
+      const response = await uploadService.uploadImage(formData);
+
+      // Update profilePictureUrl with the uploaded image URL
+      if (response.data && response.data.data && response.data.data.imageUrl) {
+        setFormData((prev) => ({
+          ...prev,
+          profilePictureUrl: response.data.data.imageUrl,
+        }));
+        setSuccess(true);
+        setTimeout(() => {
+          setSuccess(false);
+        }, 3000);
+      }
+    } catch (err) {
+      console.error("Image upload error:", err);
+      setError("Failed to upload image. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Trigger file input click when camera button is clicked
+  const handleCameraClick = () => {
+    fileInputRef.current.click();
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -63,7 +103,10 @@ export default function ProfilePage() {
     setSuccess(false);
 
     try {
-      const result = await updateProfile(formData);
+      // Make a copy of the form data to avoid token expiration issues
+      const dataToSubmit = { ...formData };
+
+      const result = await updateProfile(dataToSubmit);
 
       if (result.success) {
         setSuccess(true);
@@ -123,11 +166,18 @@ export default function ProfilePage() {
                     className="object-cover w-full h-full"
                   />
                 </div>
+                {/* Hidden file input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept="image/*"
+                  className="hidden"
+                />
                 <button
                   className="absolute bottom-0 right-0 p-2 text-white transition-colors rounded-full bg-primary-600 hover:bg-primary-700"
-                  onClick={() =>
-                    alert("Image upload is not implemented in this demo")
-                  }
+                  onClick={handleCameraClick}
+                  type="button"
                 >
                   <FiCamera size={16} />
                 </button>
@@ -232,7 +282,7 @@ export default function ProfilePage() {
                   placeholder="https://example.com/profile.jpg"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Enter a URL to an image (JPEG, PNG, etc.)
+                  Or click the camera icon to upload a new image
                 </p>
               </div>
 

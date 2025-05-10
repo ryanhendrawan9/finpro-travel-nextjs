@@ -14,7 +14,7 @@ export const api = axios.create({
     apiKey: API_KEY,
     "Content-Type": "application/json",
   },
-  // Tambahkan timeout yang lebih lama untuk request yang mungkin memerlukan waktu lama
+  // Increased timeout for requests that may take longer
   timeout: 30000,
 });
 
@@ -26,7 +26,10 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    if (typeof window !== "undefined") {
+    if (
+      typeof window !== "undefined" &&
+      process.env.NODE_ENV === "development"
+    ) {
       console.log(
         `[API Request] ${config.method?.toUpperCase() || "GET"} ${config.url}`,
         config.data || ""
@@ -40,7 +43,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for handling common errors
+// Response interceptor for handling common errors - MODIFIED FOR PROFILE UPDATE
 api.interceptors.response.use(
   (response) => {
     if (
@@ -54,10 +57,10 @@ api.interceptors.response.use(
       );
     }
 
-    // Periksa struktur respons tapi jangan tampilkan error/warn
+    // Check response structure but don't show error/warn
     if (response.data && !response.data.data && !response.data.message) {
-      // Silent warning, atau gunakan custom logger jika diperlukan
-      // console.warn("API Response tidak memiliki struktur yang diharapkan");
+      // Silent warning, or use custom logger if needed
+      // console.warn("API Response doesn't have the expected structure");
     }
 
     return response;
@@ -70,28 +73,34 @@ api.interceptors.response.use(
       status: error.response?.status || "unknown",
     };
 
-    // Gunakan silent logging tanpa menampilkan error
+    // Use silent logging without showing error
     if (process.env.NODE_ENV === "development") {
       console.log(
         `[API Request Failed] ${errorDetails.method} ${errorDetails.url} - Status: ${errorDetails.status}`
       );
     }
 
-    // Handle unauthorized errors (401)
+    // Modified 401 handler to prevent automatic logout during profile updates
     if (error.response && error.response.status === 401) {
       if (typeof window !== "undefined") {
-        localStorage.removeItem("token");
-        // Don't force navigation during SSR
-        // Gunakan window.location.href untuk reload halaman hanya jika di halaman yang bukan login
-        if (!window.location.pathname.includes("/login")) {
-          window.location.href = "/login";
+        // Check if this is a profile update request
+        const isProfileUpdate = errorDetails.url.includes("update-profile");
+
+        if (!isProfileUpdate) {
+          // Only logout for non-profile updates
+          localStorage.removeItem("token");
+
+          // Don't force navigation during SSR
+          if (!window.location.pathname.includes("/login")) {
+            window.location.href = "/login";
+          }
         }
       }
     }
 
     // Handle server errors silently
     if (error.response && error.response.status >= 500) {
-      // Hilangkan console.error, gunakan alternatif yang lebih silent:
+      // Use more silent approach for logging
       if (process.env.NODE_ENV === "development") {
         console.log("Server error occurred - status 500");
       }
@@ -105,7 +114,7 @@ api.interceptors.response.use(
   }
 );
 
-// Fungsi untuk membuat response fallback jika API gagal mengembalikan respons yang diharapkan
+// Function to create fallback response if API fails to return expected response
 const createFallbackResponse = (message = "No data returned from server") => {
   return {
     data: {

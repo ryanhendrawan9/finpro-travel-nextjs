@@ -24,7 +24,10 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         console.error("Authentication error:", err);
-        localStorage.removeItem("token");
+        // Only remove token if it's a 401 error
+        if (err.response && err.response.status === 401) {
+          localStorage.removeItem("token");
+        }
       } finally {
         setLoading(false);
       }
@@ -118,19 +121,38 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Update profile function
+  // Update profile function - Modified to handle errors better
   const updateProfile = async (profileData) => {
     setLoading(true);
     setError(null);
     try {
       const response = await authService.updateProfile(profileData);
-      setUser(response.data.data);
-      toast.success("Profile updated successfully!");
-      return { success: true };
+
+      // Update user state with the updated profile data
+      if (response.data && response.data.data) {
+        setUser(response.data.data);
+        toast.success("Profile updated successfully!");
+        return { success: true };
+      } else {
+        throw new Error("Invalid response format");
+      }
     } catch (err) {
-      const message =
-        err.response?.data?.message ||
-        "Failed to update profile. Please try again.";
+      console.error("Profile update error:", err);
+
+      // More detailed error handling
+      let message = "Failed to update profile. Please try again.";
+
+      if (err.response) {
+        // Check for specific error status codes
+        if (err.response.status === 401) {
+          // Don't automatically logout for 401 during profile update
+          message =
+            "Your session has expired. Please refresh the page and try again.";
+        } else if (err.response.data && err.response.data.message) {
+          message = err.response.data.message;
+        }
+      }
+
       setError(message);
       toast.error(message);
       return { success: false, message };
