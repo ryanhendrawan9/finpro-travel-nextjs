@@ -26,6 +26,7 @@ export const normalizeTransaction = (transaction) => {
     paymentMethod: normalizePaymentMethod(
       transaction.payment_method || transaction.paymentMethod || {}
     ),
+    user: transaction.user || {}, // Make sure user is available
   };
 };
 
@@ -37,18 +38,84 @@ export const normalizeTransaction = (transaction) => {
 export const normalizeStatus = (status) => {
   if (!status) return "pending";
 
-  const statusLower = status.toLowerCase().trim();
+  const statusLower =
+    typeof status === "string" ? status.toLowerCase().trim() : "pending";
 
-  // Map status ke nilai yang konsisten
+  // Map ALL possible status values from API to consistent values
   switch (statusLower) {
     case "pending":
+    case "menunggu pembayaran":
+    case "waiting payment":
+    case "unpaid":
       return "waiting-for-payment";
+
+    case "waiting-for-confirmation":
+    case "menunggu konfirmasi":
+    case "awaiting approval":
+    case "waiting confirmation":
+    case "verification":
+      return "waiting-for-confirmation";
+
     case "completed":
+    case "success":
+    case "berhasil":
+    case "succeeded":
+    case "paid":
+    case "selesai":
       return "success";
+
     case "cancelled":
+    case "canceled":
+    case "dibatalkan":
       return "canceled";
+
+    case "failed":
+    case "failure":
+    case "gagal":
+    case "rejected":
+    case "declined":
+      return "failed";
+
     default:
-      return statusLower;
+      // Log unknown status for debugging
+      console.warn("Unknown transaction status detected:", status);
+
+      // Try to match key parts of the status string for unknown formats
+      if (
+        statusLower.includes("wait") ||
+        statusLower.includes("pending") ||
+        statusLower.includes("tunggu")
+      ) {
+        if (
+          statusLower.includes("confirm") ||
+          statusLower.includes("konfirmasi") ||
+          statusLower.includes("verif")
+        ) {
+          return "waiting-for-confirmation";
+        } else {
+          return "waiting-for-payment";
+        }
+      } else if (
+        statusLower.includes("fail") ||
+        statusLower.includes("gagal") ||
+        statusLower.includes("reject")
+      ) {
+        return "failed";
+      } else if (
+        statusLower.includes("success") ||
+        statusLower.includes("berhasil") ||
+        statusLower.includes("comple")
+      ) {
+        return "success";
+      } else if (
+        statusLower.includes("cancel") ||
+        statusLower.includes("batal")
+      ) {
+        return "canceled";
+      }
+
+      // Default to pending if truly unknown
+      return "waiting-for-payment";
   }
 };
 
@@ -87,15 +154,10 @@ export const normalizeActivityData = (activity) => {
 
   // Handle image URLs in different formats
   let imageUrls = [];
-  if (Array.isArray(activity.imageUrls)) {
+  if (Array.isArray(activity.imageUrls) && activity.imageUrls.length > 0) {
     imageUrls = activity.imageUrls;
   } else if (activity.imageUrl) {
     imageUrls = [activity.imageUrl];
-  } else if (
-    Array.isArray(activity.imageUrls) &&
-    activity.imageUrls.length > 0
-  ) {
-    imageUrls = activity.imageUrls;
   }
 
   // Normalize price values

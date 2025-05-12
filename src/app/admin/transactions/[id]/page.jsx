@@ -10,21 +10,18 @@ import {
   FiCalendar,
   FiCheckCircle,
   FiXCircle,
-  FiUpload,
   FiDownload,
   FiInfo,
-  FiAlertCircle,
   FiDollarSign,
   FiUser,
   FiEye,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 import { useTransaction } from "@/hooks/useTransaction";
-import FileUploader from "@/components/upload/FileUploader";
 import ImageViewer from "@/components/ui/ImageViewer";
 import { toast } from "react-toastify";
 
-export default function TransactionDetailPage({ params }) {
+export default function AdminTransactionDetailPage({ params }) {
   const id = use(params).id;
   const { isAuthenticated, user } = useAuth();
   const {
@@ -32,29 +29,25 @@ export default function TransactionDetailPage({ params }) {
     isLoading,
     error,
     updatingTransaction,
-    isUploading,
     fetchTransaction,
     updateTransactionStatus,
-    uploadPaymentProof,
-    cancelTransaction,
   } = useTransaction();
-  const [showUploadModal, setShowUploadModal] = useState(false);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const router = useRouter();
 
-  // Redirect to login if not authenticated
+  // Redirect if not authenticated or not an admin
   useEffect(() => {
-    if (!isAuthenticated && !isLoading) {
+    if (!isLoading && (!isAuthenticated || (user && user.role !== "admin"))) {
       router.push("/login");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
   // Fetch transaction data
   useEffect(() => {
-    if (id && isAuthenticated) {
+    if (id && isAuthenticated && user?.role === "admin") {
       fetchTransaction(id);
     }
-  }, [id, isAuthenticated, fetchTransaction]);
+  }, [id, isAuthenticated, user, fetchTransaction]);
 
   // Format date safely
   const formatDate = (dateString) => {
@@ -112,8 +105,7 @@ export default function TransactionDetailPage({ params }) {
           color: "text-yellow-600 bg-yellow-100",
           icon: <FiClock className="mr-2" />,
           text: "Waiting for Payment",
-          description:
-            "Please complete your payment and upload proof of payment",
+          description: "Customer needs to complete payment and upload proof",
         };
       case "waiting-for-confirmation":
         return {
@@ -121,7 +113,7 @@ export default function TransactionDetailPage({ params }) {
           icon: <FiInfo className="mr-2" />,
           text: "Waiting for Confirmation",
           description:
-            "We're reviewing your payment. This may take 1-2 business days.",
+            "Payment proof has been uploaded. Review and approve/reject payment.",
         };
       case "success":
       case "completed":
@@ -129,22 +121,21 @@ export default function TransactionDetailPage({ params }) {
           color: "text-green-600 bg-green-100",
           icon: <FiCheckCircle className="mr-2" />,
           text: "Success",
-          description: "Your transaction has been completed successfully",
+          description: "Transaction has been completed successfully",
         };
       case "failed":
         return {
           color: "text-red-600 bg-red-100",
           icon: <FiXCircle className="mr-2" />,
           text: "Failed",
-          description:
-            "Your payment was not approved. Please contact support for assistance.",
+          description: "Payment was not approved",
         };
       case "canceled":
         return {
           color: "text-gray-600 bg-gray-100",
           icon: <FiXCircle className="mr-2" />,
           text: "Canceled",
-          description: "This transaction has been canceled",
+          description: "Transaction has been canceled",
         };
       default:
         return {
@@ -156,37 +147,26 @@ export default function TransactionDetailPage({ params }) {
     }
   };
 
-  // Handle file upload completion
-  const handleFileUploaded = async (fileData) => {
-    if (fileData && fileData.imageUrl) {
-      try {
-        // Use the transaction hook to update the proof payment
-        await uploadPaymentProof(id, fileData.imageUrl);
-        setShowUploadModal(false);
-
-        // Reload the transaction to show updated data
-        setTimeout(() => {
-          fetchTransaction(id);
-        }, 500);
-      } catch (error) {
-        console.error("Error updating proof payment:", error);
-        toast.error("Failed to update payment proof. Please try again.");
-      }
-    }
-  };
-
-  // Handle cancel transaction
-  const handleCancelTransaction = async () => {
-    if (!confirm("Are you sure you want to cancel this transaction?")) {
-      return;
-    }
-
-    await cancelTransaction(id);
-  };
-
-  // Handle approve/reject payment (admin only)
+  // Handle approve/reject payment
   const handleUpdateStatus = async (status) => {
-    await updateTransactionStatus(id, status);
+    try {
+      await updateTransactionStatus(id, status);
+
+      // Toast notification based on action
+      if (status === "success") {
+        toast.success("Payment approved successfully");
+      } else if (status === "failed") {
+        toast.error("Payment rejected");
+      }
+
+      // Force refresh data after short delay
+      setTimeout(() => {
+        fetchTransaction(id);
+      }, 500);
+    } catch (error) {
+      console.error("Error updating transaction status:", error);
+      toast.error("Failed to update transaction status");
+    }
   };
 
   if (isLoading) {
@@ -206,7 +186,7 @@ export default function TransactionDetailPage({ params }) {
           {error || "Transaction not found"}
         </div>
         <button
-          onClick={() => router.push("/transaction")}
+          onClick={() => router.push("/admin/transactions")}
           className="flex items-center px-6 py-2 text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
         >
           <FiArrowLeft className="mr-2" /> Back to Transactions
@@ -232,22 +212,22 @@ export default function TransactionDetailPage({ params }) {
 
   const statusInfo = getStatusInfo(status);
 
-  // Check if current user is admin
-  const isAdmin = user?.role === "admin";
-
   return (
     <div className="py-20 bg-gray-50">
       <div className="max-w-4xl px-4 pt-8 mx-auto sm:px-6 lg:px-8">
         <div className="mb-8">
           <Link
-            href="/transaction"
+            href="/admin/transactions"
             className="flex items-center text-gray-600 transition-colors hover:text-primary-600"
           >
             <FiArrowLeft className="mr-2" /> Back to Transactions
           </Link>
           <h1 className="mt-4 text-3xl font-bold text-gray-900 font-heading">
-            Transaction Details
+            Admin: Transaction Details
           </h1>
+          <p className="mt-2 text-gray-600">
+            Review and manage this transaction
+          </p>
         </div>
 
         <motion.div
@@ -256,6 +236,64 @@ export default function TransactionDetailPage({ params }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
         >
+          {/* Action Bar - Quick Status Update */}
+          {status === "waiting-for-confirmation" && (
+            <div className="px-6 py-4 border-b border-gray-200 bg-blue-50">
+              <div className="flex flex-col justify-between space-y-4 md:space-y-0 md:flex-row md:items-center">
+                <div className="flex items-center">
+                  <FiInfo className="w-5 h-5 mr-2 text-blue-600" />
+                  <span className="font-medium text-blue-800">
+                    Payment proof has been uploaded and awaiting your review
+                  </span>
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => handleUpdateStatus("failed")}
+                    disabled={updatingTransaction === transactionId}
+                    className={`px-4 py-2 text-white rounded-lg ${
+                      updatingTransaction === transactionId
+                        ? "bg-red-400 cursor-not-allowed"
+                        : "bg-red-600 hover:bg-red-700"
+                    }`}
+                  >
+                    {updatingTransaction === transactionId ? (
+                      <span className="flex items-center">
+                        <span className="w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
+                        Processing...
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <FiXCircle className="mr-2" />
+                        Reject Payment
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => handleUpdateStatus("success")}
+                    disabled={updatingTransaction === transactionId}
+                    className={`px-4 py-2 text-white rounded-lg ${
+                      updatingTransaction === transactionId
+                        ? "bg-green-400 cursor-not-allowed"
+                        : "bg-green-600 hover:bg-green-700"
+                    }`}
+                  >
+                    {updatingTransaction === transactionId ? (
+                      <span className="flex items-center">
+                        <span className="w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
+                        Processing...
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <FiCheckCircle className="mr-2" />
+                        Approve Payment
+                      </span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Transaction header */}
           <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <div className="flex flex-col justify-between md:flex-row md:items-center">
@@ -428,80 +466,6 @@ export default function TransactionDetailPage({ params }) {
               </div>
             </div>
 
-            {/* Payment proof upload - Only show if status is waiting for payment */}
-            {(status === "waiting-for-payment" || status === "pending") && (
-              <div className="p-6 mt-6 border-t border-gray-200 rounded-lg bg-gray-50">
-                <h3 className="flex items-center mb-4 text-lg font-bold text-gray-900">
-                  <FiUpload className="mr-2 text-primary-600" />
-                  Upload Payment Proof
-                </h3>
-
-                <div className="p-4 mb-4 border border-yellow-200 rounded-lg bg-yellow-50">
-                  <div className="flex items-start">
-                    <FiInfo className="text-yellow-500 mt-0.5 mr-3 flex-shrink-0" />
-                    <div>
-                      <h4 className="font-medium text-yellow-800">
-                        Payment Instructions
-                      </h4>
-                      <p className="mt-1 text-sm text-yellow-700">
-                        Please complete your payment to the account details
-                        below, then upload your payment proof.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {paymentMethod && (
-                  <div className="p-4 mb-4 bg-white border border-gray-200 rounded-lg">
-                    <div className="flex items-center mb-2">
-                      {paymentMethod.imageUrl && (
-                        <img
-                          src={paymentMethod.imageUrl}
-                          alt={paymentMethod.name}
-                          className="h-8 mr-3"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src =
-                              "/images/placeholders/payment-placeholder.jpg";
-                          }}
-                        />
-                      )}
-                      <h4 className="font-medium text-gray-800">
-                        {paymentMethod.name}
-                      </h4>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Account Number:{" "}
-                      <span className="font-medium">
-                        {paymentMethod.virtual_account_number ||
-                          "1234-5678-9012-3456"}
-                      </span>
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Account Name:{" "}
-                      <span className="font-medium">
-                        {paymentMethod.virtual_account_name || "TravelBright"}
-                      </span>
-                    </p>
-                    <p className="mt-2 text-sm text-gray-600">
-                      Amount to Pay:{" "}
-                      <span className="font-medium text-primary-600">
-                        {formatCurrency(amount)}
-                      </span>
-                    </p>
-                  </div>
-                )}
-
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="flex items-center justify-center w-full px-4 py-3 font-medium text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
-                >
-                  <FiUpload className="mr-2" />
-                  Upload Payment Proof
-                </button>
-              </div>
-            )}
-
             {/* Transaction items */}
             <div className="px-6 py-6 mt-6 border-t border-gray-200">
               <h3 className="mb-4 text-lg font-bold text-gray-900">
@@ -567,26 +531,72 @@ export default function TransactionDetailPage({ params }) {
               </div>
             </div>
 
-            {/* Actions */}
+            {/* Actions for different statuses */}
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-              {(status === "waiting-for-payment" || status === "pending") && (
-                <div className="flex justify-between">
-                  <button
-                    className="px-4 py-2 text-gray-700 transition-colors border border-gray-300 rounded-lg hover:bg-gray-100"
-                    onClick={handleCancelTransaction}
-                  >
-                    Cancel Transaction
-                  </button>
+              {/* Action for waiting-for-confirmation */}
+              {status === "waiting-for-confirmation" && (
+                <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
+                  <div className="flex items-start">
+                    <FiInfo className="text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
+                    <div>
+                      <h4 className="font-medium text-blue-800">
+                        Payment Review Required
+                      </h4>
+                      <p className="mt-1 text-sm text-blue-700">
+                        The customer has uploaded payment proof. Please review
+                        and either approve or reject this payment.
+                      </p>
+                    </div>
+                  </div>
 
-                  <Link
-                    href="/activity"
-                    className="px-4 py-2 text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
-                  >
-                    Browse More Activities
-                  </Link>
+                  <div className="flex justify-end gap-3 mt-4">
+                    <button
+                      onClick={() => handleUpdateStatus("failed")}
+                      disabled={updatingTransaction === transactionId}
+                      className={`px-4 py-2 text-white transition-colors rounded-lg ${
+                        updatingTransaction === transactionId
+                          ? "bg-red-400 cursor-not-allowed"
+                          : "bg-red-600 hover:bg-red-700"
+                      }`}
+                    >
+                      {updatingTransaction === transactionId ? (
+                        <>
+                          <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <FiXCircle className="inline-block mr-2" />
+                          Reject Payment
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={() => handleUpdateStatus("success")}
+                      disabled={updatingTransaction === transactionId}
+                      className={`px-4 py-2 text-white transition-colors rounded-lg ${
+                        updatingTransaction === transactionId
+                          ? "bg-green-400 cursor-not-allowed"
+                          : "bg-green-600 hover:bg-green-700"
+                      }`}
+                    >
+                      {updatingTransaction === transactionId ? (
+                        <>
+                          <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <FiCheckCircle className="inline-block mr-2" />
+                          Approve Payment
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               )}
 
+              {/* Status messages for other statuses */}
               {status === "success" && (
                 <div className="p-4 border border-green-200 rounded-lg bg-green-50">
                   <div className="flex items-start">
@@ -596,8 +606,7 @@ export default function TransactionDetailPage({ params }) {
                         Payment Completed
                       </h4>
                       <p className="mt-1 text-sm text-green-700">
-                        Your transaction has been successfully completed. Thank
-                        you for your purchase!
+                        This transaction has been successfully completed.
                       </p>
                     </div>
                   </div>
@@ -613,8 +622,7 @@ export default function TransactionDetailPage({ params }) {
                         Payment Failed
                       </h4>
                       <p className="mt-1 text-sm text-red-700">
-                        Your transaction has failed. Please try again or contact
-                        customer support for assistance.
+                        This transaction's payment was rejected.
                       </p>
                     </div>
                   </div>
@@ -630,104 +638,33 @@ export default function TransactionDetailPage({ params }) {
                         Transaction Canceled
                       </h4>
                       <p className="mt-1 text-sm text-gray-700">
-                        This transaction has been canceled. You can make a new
-                        purchase from our activities page.
+                        This transaction has been canceled by the customer.
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {status === "waiting-for-confirmation" && (
-                <div className="p-4 border border-blue-200 rounded-lg bg-blue-50">
+              {status === "waiting-for-payment" && (
+                <div className="p-4 border border-yellow-200 rounded-lg bg-yellow-50">
                   <div className="flex items-start">
-                    <FiInfo className="text-blue-500 mt-0.5 mr-3 flex-shrink-0" />
+                    <FiClock className="text-yellow-500 mt-0.5 mr-3 flex-shrink-0" />
                     <div>
-                      <h4 className="font-medium text-blue-800">
-                        Payment Under Review
+                      <h4 className="font-medium text-yellow-800">
+                        Awaiting Payment
                       </h4>
-                      <p className="mt-1 text-sm text-blue-700">
-                        Your payment is being verified. This usually takes 1-2
-                        business days. We'll notify you once the verification is
-                        complete.
+                      <p className="mt-1 text-sm text-yellow-700">
+                        The customer still needs to complete payment and upload
+                        payment proof.
                       </p>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {/* Admin actions */}
-              {isAdmin && status === "waiting-for-confirmation" && (
-                <div className="flex justify-end gap-3 mt-4">
-                  <button
-                    onClick={() => handleUpdateStatus("failed")}
-                    disabled={updatingTransaction === transactionId}
-                    className={`px-4 py-2 text-white transition-colors rounded-lg ${
-                      updatingTransaction === transactionId
-                        ? "bg-red-400 cursor-not-allowed"
-                        : "bg-red-600 hover:bg-red-700"
-                    }`}
-                  >
-                    {updatingTransaction === transactionId ? (
-                      <>
-                        <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <FiXCircle className="inline-block mr-2" />
-                        Reject Payment
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => handleUpdateStatus("success")}
-                    disabled={updatingTransaction === transactionId}
-                    className={`px-4 py-2 text-white transition-colors rounded-lg ${
-                      updatingTransaction === transactionId
-                        ? "bg-green-400 cursor-not-allowed"
-                        : "bg-green-600 hover:bg-green-700"
-                    }`}
-                  >
-                    {updatingTransaction === transactionId ? (
-                      <>
-                        <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <FiCheckCircle className="inline-block mr-2" />
-                        Approve Payment
-                      </>
-                    )}
-                  </button>
                 </div>
               )}
             </div>
           </div>
         </motion.div>
       </div>
-
-      {/* Upload modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="w-full max-w-lg p-6 bg-white rounded-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                Upload Payment Proof
-              </h2>
-              <button
-                onClick={() => setShowUploadModal(false)}
-                className="p-2 text-gray-500 transition-colors rounded-full hover:bg-gray-100"
-              >
-                <FiXCircle size={20} />
-              </button>
-            </div>
-
-            <FileUploader onFileUploaded={handleFileUploaded} />
-          </div>
-        </div>
-      )}
 
       {/* Image Viewer Modal */}
       {showImageViewer && proofPaymentUrl && (

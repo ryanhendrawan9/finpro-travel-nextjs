@@ -16,27 +16,34 @@ import {
   FiEye,
   FiDollarSign,
   FiUser,
+  FiCalendar,
+  FiRefreshCw,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
-import { transactionService } from "@/lib/api";
+import { useTransaction } from "@/hooks/useTransaction";
 import { toast } from "react-toastify";
 import debounce from "lodash/debounce";
-import { normalizeStatus } from "@/lib/transaction-helpers"; // Import helper
 
 export default function AdminTransactions() {
   const { user, isAuthenticated, loading } = useAuth();
+  const {
+    transactions,
+    isLoading,
+    error,
+    updatingTransaction,
+    fetchAllTransactions,
+    updateTransactionStatus,
+    filterTransactionsByStatus,
+  } = useTransaction();
+
   const router = useRouter();
-  const [transactions, setTransactions] = useState([]);
-  const [filteredTransactions, setFilteredTransactions] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState(null);
-  const [updatingTransaction, setUpdatingTransaction] = useState(null);
+  const [filteredTransactions, setFilteredTransactions] = useState([]);
   const transactionsPerPage = 10;
 
   // Debounced search function
@@ -56,147 +63,51 @@ export default function AdminTransactions() {
 
   // Fetch transactions
   useEffect(() => {
-    const fetchTransactions = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        const response = await transactionService.getAllTransactions();
-        console.log("Admin transactions data:", response.data);
-
-        if (!response.data || !response.data.data) {
-          throw new Error("Invalid response format from server");
-        }
-
-        // Process transactions to ensure they have valid amounts and normalized status
-        const processedTransactions = (response.data.data || []).map(
-          (transaction) => {
-            // Normalize status to handle inconsistencies
-            transaction.status = normalizeStatus(transaction.status);
-
-            // If amount is missing or zero, calculate from cart items
-            if (!transaction.amount || transaction.amount === 0) {
-              // Check cart field
-              if (transaction.cart && transaction.cart.length > 0) {
-                let calculatedTotal = 0;
-
-                transaction.cart.forEach((item) => {
-                  if (item.activity) {
-                    const price =
-                      item.activity.price_discount || item.activity.price || 0;
-                    const quantity = item.quantity || 1;
-                    calculatedTotal += parseInt(price) * parseInt(quantity);
-                  }
-                });
-
-                if (calculatedTotal > 0) {
-                  transaction.amount = calculatedTotal;
-                }
-              }
-              // Check transaction_items field as an alternative
-              else if (
-                transaction.transaction_items &&
-                transaction.transaction_items.length > 0
-              ) {
-                let calculatedTotal = 0;
-
-                transaction.transaction_items.forEach((item) => {
-                  const price = item.price_discount || item.price || 0;
-                  const quantity = item.quantity || 1;
-                  calculatedTotal += parseInt(price) * parseInt(quantity);
-                });
-
-                if (calculatedTotal > 0) {
-                  transaction.amount = calculatedTotal;
-                }
-              }
-
-              // Check totalAmount field
-              if (transaction.totalAmount && transaction.totalAmount > 0) {
-                transaction.amount = transaction.totalAmount;
-              }
-            }
-
-            // Ensure cart is available for display in modal
-            if (!transaction.cart && transaction.transaction_items) {
-              transaction.cart = transaction.transaction_items.map((item) => ({
-                id: item.id,
-                quantity: item.quantity || 1,
-                activity: {
-                  id: item.id,
-                  title: item.title || "Unnamed Activity",
-                  price: item.price || 0,
-                  price_discount: item.price_discount || null,
-                  imageUrls: Array.isArray(item.imageUrls)
-                    ? item.imageUrls
-                    : item.imageUrl
-                    ? [item.imageUrl]
-                    : [],
-                },
-              }));
-            }
-
-            return transaction;
-          }
-        );
-
-        setTransactions(processedTransactions);
-        setFilteredTransactions(processedTransactions);
-      } catch (err) {
-        console.error("Error fetching transactions:", err);
-        setError(
-          `Failed to load transactions: ${err.message || "Unknown error"}`
-        );
-        toast.error("Failed to load transactions. Please try again later.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     if (isAuthenticated && user?.role === "admin") {
-      fetchTransactions();
+      fetchAllTransactions();
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, fetchAllTransactions]);
 
   // Filter transactions when search or status filter changes
   useEffect(() => {
     // Create a function to filter transactions based on filters
-    const filterTransactions = () => {
-      return transactions.filter((transaction) => {
-        // Status filter
-        if (statusFilter !== "all") {
-          const normalizedStatus = normalizeStatus(transaction.status);
-          if (normalizedStatus !== statusFilter) {
-            return false;
-          }
-        }
+    const applyFilters = () => {
+      // First, filter by status
+      let results =
+        statusFilter === "all"
+          ? transactions
+          : filterTransactionsByStatus(statusFilter);
 
-        // Search query filter - only process if there's a search query
-        if (debouncedSearchQuery) {
-          const query = debouncedSearchQuery.toLowerCase();
+      // Then apply search filter if needed
+      if (debouncedSearchQuery) {
+        const query = debouncedSearchQuery.toLowerCase();
 
-          // Early return if ID matches (most specific)
+        results = results.filter((transaction) => {
           const id = transaction.id?.toLowerCase() || "";
           if (id.includes(query)) return true;
 
-          // Then check user name and email
           const userName = transaction.user?.name?.toLowerCase() || "";
           const userEmail = transaction.user?.email?.toLowerCase() || "";
 
           return userName.includes(query) || userEmail.includes(query);
-        }
+        });
+      }
 
-        return true;
-      });
+      return results;
     };
 
     // Apply the filters
-    const filtered = filterTransactions();
+    const filtered = applyFilters();
     setFilteredTransactions(filtered);
 
     // Always reset to first page when filters change
     setCurrentPage(1);
-  }, [debouncedSearchQuery, statusFilter, transactions]);
+  }, [
+    debouncedSearchQuery,
+    statusFilter,
+    transactions,
+    filterTransactionsByStatus,
+  ]);
 
   // Pagination
   const indexOfLastTransaction = currentPage * transactionsPerPage;
@@ -253,11 +164,11 @@ export default function AdminTransactions() {
         text: "Unknown",
       };
 
-    // Normalize status first
-    const normalizedStatus = normalizeStatus(status);
+    const statusLower = status.toLowerCase();
 
-    switch (normalizedStatus) {
+    switch (statusLower) {
       case "waiting-for-payment":
+      case "pending":
         return {
           color: "text-yellow-600 bg-yellow-100",
           icon: <FiClock className="mr-2" />,
@@ -270,6 +181,7 @@ export default function AdminTransactions() {
           text: "Waiting for Confirmation",
         };
       case "success":
+      case "completed":
         return {
           color: "text-green-600 bg-green-100",
           icon: <FiCheckCircle className="mr-2" />,
@@ -282,6 +194,7 @@ export default function AdminTransactions() {
           text: "Failed",
         };
       case "canceled":
+      case "cancelled":
         return {
           color: "text-gray-600 bg-gray-100",
           icon: <FiXCircle className="mr-2" />,
@@ -298,134 +211,15 @@ export default function AdminTransactions() {
 
   // Handle status update
   const handleUpdateStatus = async (id, status) => {
-    setUpdatingTransaction(id);
-    try {
-      await transactionService.updateStatus(id, { status });
-
-      // Update local state
-      const updatedTransactions = transactions.map((trans) =>
-        trans.id === id ? { ...trans, status } : trans
-      );
-
-      setTransactions(updatedTransactions);
-      setFilteredTransactions(
-        updatedTransactions.filter(
-          (trans) =>
-            statusFilter === "all" ||
-            normalizeStatus(trans.status) === statusFilter
-        )
-      );
-
-      setIsModalOpen(false);
-      setSelectedTransaction(null);
-
-      toast.success(`Transaction status updated to ${status}`);
-    } catch (error) {
-      console.error("Error updating transaction status:", error);
-      toast.error(
-        "Failed to update transaction status: " +
-          (error.message || "Unknown error")
-      );
-    } finally {
-      setUpdatingTransaction(null);
-    }
+    await updateTransactionStatus(id, status);
+    setIsModalOpen(false);
+    setSelectedTransaction(null);
   };
 
   // View transaction details
   const viewTransactionDetails = (transaction) => {
     setSelectedTransaction(transaction);
     setIsModalOpen(true);
-  };
-
-  // Retry fetching transactions
-  const retryFetchTransactions = async () => {
-    if (isAuthenticated && user?.role === "admin") {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await transactionService.getAllTransactions();
-
-        // Process transactions with normalized status and valid amounts
-        const processedTransactions = (response.data.data || []).map(
-          (transaction) => {
-            // Normalize status
-            transaction.status = normalizeStatus(transaction.status);
-
-            // Calculate amounts if needed
-            if (!transaction.amount || transaction.amount === 0) {
-              // Check cart field
-              if (transaction.cart && transaction.cart.length > 0) {
-                let calculatedTotal = 0;
-                transaction.cart.forEach((item) => {
-                  if (item.activity) {
-                    const price =
-                      item.activity.price_discount || item.activity.price || 0;
-                    const quantity = item.quantity || 1;
-                    calculatedTotal += parseInt(price) * parseInt(quantity);
-                  }
-                });
-                if (calculatedTotal > 0) {
-                  transaction.amount = calculatedTotal;
-                }
-              }
-              // Check transaction_items as alternative
-              else if (
-                transaction.transaction_items &&
-                transaction.transaction_items.length > 0
-              ) {
-                let calculatedTotal = 0;
-                transaction.transaction_items.forEach((item) => {
-                  const price = item.price_discount || item.price || 0;
-                  const quantity = item.quantity || 1;
-                  calculatedTotal += parseInt(price) * parseInt(quantity);
-                });
-                if (calculatedTotal > 0) {
-                  transaction.amount = calculatedTotal;
-                }
-              }
-
-              // Check totalAmount field
-              if (transaction.totalAmount && transaction.totalAmount > 0) {
-                transaction.amount = transaction.totalAmount;
-              }
-            }
-
-            // Ensure cart is available for display in modal
-            if (!transaction.cart && transaction.transaction_items) {
-              transaction.cart = transaction.transaction_items.map((item) => ({
-                id: item.id,
-                quantity: item.quantity || 1,
-                activity: {
-                  id: item.id,
-                  title: item.title || "Unnamed Activity",
-                  price: item.price || 0,
-                  price_discount: item.price_discount || null,
-                  imageUrls: Array.isArray(item.imageUrls)
-                    ? item.imageUrls
-                    : item.imageUrl
-                    ? [item.imageUrl]
-                    : [],
-                },
-              }));
-            }
-
-            return transaction;
-          }
-        );
-
-        setTransactions(processedTransactions);
-        setFilteredTransactions(processedTransactions);
-        toast.success("Transactions loaded successfully");
-      } catch (err) {
-        console.error("Error retrying transaction fetch:", err);
-        setError(
-          `Failed to load transactions: ${err.message || "Unknown error"}`
-        );
-        toast.error("Failed to load transactions. Please try again later.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
   };
 
   if (loading || isLoading) {
@@ -462,7 +256,7 @@ export default function AdminTransactions() {
               <span>{error}</span>
             </div>
             <button
-              onClick={retryFetchTransactions}
+              onClick={() => fetchAllTransactions()}
               className="px-4 py-2 mt-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
             >
               Try Again
@@ -471,8 +265,8 @@ export default function AdminTransactions() {
         )}
 
         {/* Filters */}
-        <div className="flex flex-col mb-6 space-y-4 md:space-y-0 md:space-x-4 md:flex-row md:items-center">
-          <div className="relative flex-grow">
+        <div className="flex flex-col mb-6 space-y-4 md:space-y-0 md:flex-row md:items-center md:justify-between">
+          <div className="relative flex-grow md:max-w-md">
             <FiSearch className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
             <input
               type="text"
@@ -486,22 +280,86 @@ export default function AdminTransactions() {
             />
           </div>
 
-          <div className="flex items-center space-x-2">
-            <FiFilter className="text-gray-500" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <FiFilter className="text-gray-500" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              >
+                <option value="all">All Statuses</option>
+                <option value="waiting-for-payment">Waiting for Payment</option>
+                <option value="waiting-for-confirmation">
+                  Waiting for Confirmation
+                </option>
+                <option value="success">Success</option>
+                <option value="failed">Failed</option>
+                <option value="canceled">Canceled</option>
+              </select>
+            </div>
+
+            <button
+              onClick={() => fetchAllTransactions()}
+              className="flex items-center px-3 py-2 text-gray-600 transition-colors bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              title="Refresh transactions"
             >
-              <option value="all">All Statuses</option>
-              <option value="waiting-for-payment">Waiting for Payment</option>
-              <option value="waiting-for-confirmation">
-                Waiting for Confirmation
-              </option>
-              <option value="success">Success</option>
-              <option value="failed">Failed</option>
-              <option value="canceled">Canceled</option>
-            </select>
+              <FiRefreshCw size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Status summary */}
+        <div className="grid grid-cols-2 gap-4 mb-6 md:grid-cols-5">
+          <div
+            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
+            onClick={() => setStatusFilter("all")}
+          >
+            <div className="text-sm text-gray-500">All</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {transactions.length}
+            </div>
+          </div>
+
+          <div
+            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
+            onClick={() => setStatusFilter("waiting-for-payment")}
+          >
+            <div className="text-sm text-yellow-600">Pending</div>
+            <div className="text-2xl font-bold text-yellow-600">
+              {filterTransactionsByStatus("waiting-for-payment").length}
+            </div>
+          </div>
+
+          <div
+            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
+            onClick={() => setStatusFilter("waiting-for-confirmation")}
+          >
+            <div className="text-sm text-blue-600">Waiting Confirmation</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {filterTransactionsByStatus("waiting-for-confirmation").length}
+            </div>
+          </div>
+
+          <div
+            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
+            onClick={() => setStatusFilter("success")}
+          >
+            <div className="text-sm text-green-600">Successful</div>
+            <div className="text-2xl font-bold text-green-600">
+              {filterTransactionsByStatus("success").length}
+            </div>
+          </div>
+
+          <div
+            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
+            onClick={() => setStatusFilter("failed")}
+          >
+            <div className="text-sm text-red-600">Failed/Canceled</div>
+            <div className="text-2xl font-bold text-red-600">
+              {filterTransactionsByStatus("failed").length +
+                filterTransactionsByStatus("canceled").length}
+            </div>
           </div>
         </div>
 
@@ -550,133 +408,141 @@ export default function AdminTransactions() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {currentTransactions.map((transaction) => {
-                  const statusDetails = getStatusDetails(transaction?.status);
-                  const shortId = transaction.id?.substring(0, 8) || "unknown";
+                {currentTransactions.length > 0 ? (
+                  currentTransactions.map((transaction) => {
+                    const statusDetails = getStatusDetails(transaction?.status);
+                    const shortId =
+                      transaction.id?.substring(0, 8) || "unknown";
 
-                  return (
-                    <tr key={transaction.id}>
-                      <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                        #{shortId}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-8 h-8 mr-3 overflow-hidden rounded-full">
-                            <img
-                              src={
-                                transaction.user?.profilePictureUrl ||
-                                "/images/placeholders/user-placeholder.jpg"
-                              }
-                              alt={transaction.user?.name || "User"}
-                              className="object-cover w-full h-full"
-                              onError={(e) => {
-                                e.target.onerror = null;
-                                e.target.src =
-                                  "/images/placeholders/user-placeholder.jpg";
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <div className="font-medium">
-                              {transaction.user?.name || "Unknown user"}
+                    return (
+                      <tr key={transaction.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                          #{shortId}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="w-8 h-8 mr-3 overflow-hidden rounded-full">
+                              <img
+                                src={
+                                  transaction.user?.profilePictureUrl ||
+                                  "/images/placeholders/user-placeholder.jpg"
+                                }
+                                alt={transaction.user?.name || "User"}
+                                className="object-cover w-full h-full"
+                                onError={(e) => {
+                                  e.target.onerror = null;
+                                  e.target.src =
+                                    "/images/placeholders/user-placeholder.jpg";
+                                }}
+                              />
                             </div>
-                            <div className="text-xs text-gray-500">
-                              {transaction.user?.email || "No email"}
+                            <div>
+                              <div className="font-medium">
+                                {transaction.user?.name || "Unknown user"}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {transaction.user?.email || "No email"}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                        {formatCurrency(
-                          transaction.amount || transaction.totalAmount
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDetails.color}`}
-                        >
-                          {statusDetails.icon} {statusDetails.text}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                        {formatDate(transaction.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                        <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => viewTransactionDetails(transaction)}
-                            className="p-1 text-blue-600 transition-colors rounded-md hover:bg-blue-50"
-                            title="View details"
-                          >
-                            <FiEye size={18} />
-                          </button>
-
-                          <Link
-                            href={`/transaction/${transaction.id}`}
-                            className="p-1 text-green-600 transition-colors rounded-md hover:bg-green-50"
-                            title="View transaction page"
-                          >
-                            <FiExternalLink size={18} />
-                          </Link>
-
-                          {normalizeStatus(transaction.status) ===
-                            "waiting-for-confirmation" && (
-                            <>
-                              <button
-                                onClick={() =>
-                                  handleUpdateStatus(transaction.id, "success")
-                                }
-                                disabled={
-                                  updatingTransaction === transaction.id
-                                }
-                                className={`p-1 text-green-600 transition-colors rounded-md ${
-                                  updatingTransaction === transaction.id
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : "hover:bg-green-50"
-                                }`}
-                                title="Approve payment"
-                              >
-                                {updatingTransaction === transaction.id ? (
-                                  <span className="inline-block w-4 h-4 border-2 border-green-600 rounded-full border-t-transparent animate-spin"></span>
-                                ) : (
-                                  <FiCheckCircle size={18} />
-                                )}
-                              </button>
-                              <button
-                                onClick={() =>
-                                  handleUpdateStatus(transaction.id, "failed")
-                                }
-                                disabled={
-                                  updatingTransaction === transaction.id
-                                }
-                                className={`p-1 text-red-600 transition-colors rounded-md ${
-                                  updatingTransaction === transaction.id
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : "hover:bg-red-50"
-                                }`}
-                                title="Reject payment"
-                              >
-                                {updatingTransaction === transaction.id ? (
-                                  <span className="inline-block w-4 h-4 border-2 border-red-600 rounded-full border-t-transparent animate-spin"></span>
-                                ) : (
-                                  <FiXCircle size={18} />
-                                )}
-                              </button>
-                            </>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                          {formatCurrency(
+                            transaction.amount || transaction.totalAmount
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDetails.color}`}
+                          >
+                            {statusDetails.icon} {statusDetails.text}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                          {formatDate(transaction.createdAt)}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() =>
+                                viewTransactionDetails(transaction)
+                              }
+                              className="p-1 text-blue-600 transition-colors rounded-md hover:bg-blue-50"
+                              title="View details"
+                            >
+                              <FiEye size={18} />
+                            </button>
 
-                {filteredTransactions.length === 0 && (
+                            <Link
+                              href={`/transaction/${transaction.id}`}
+                              className="p-1 text-green-600 transition-colors rounded-md hover:bg-green-50"
+                              title="View transaction page"
+                            >
+                              <FiExternalLink size={18} />
+                            </Link>
+
+                            {transaction.status ===
+                              "waiting-for-confirmation" && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    handleUpdateStatus(
+                                      transaction.id,
+                                      "success"
+                                    )
+                                  }
+                                  disabled={
+                                    updatingTransaction === transaction.id
+                                  }
+                                  className={`p-1 text-green-600 transition-colors rounded-md ${
+                                    updatingTransaction === transaction.id
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : "hover:bg-green-50"
+                                  }`}
+                                  title="Approve payment"
+                                >
+                                  {updatingTransaction === transaction.id ? (
+                                    <span className="inline-block w-4 h-4 border-2 border-green-600 rounded-full border-t-transparent animate-spin"></span>
+                                  ) : (
+                                    <FiCheckCircle size={18} />
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    handleUpdateStatus(transaction.id, "failed")
+                                  }
+                                  disabled={
+                                    updatingTransaction === transaction.id
+                                  }
+                                  className={`p-1 text-red-600 transition-colors rounded-md ${
+                                    updatingTransaction === transaction.id
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : "hover:bg-red-50"
+                                  }`}
+                                  title="Reject payment"
+                                >
+                                  {updatingTransaction === transaction.id ? (
+                                    <span className="inline-block w-4 h-4 border-2 border-red-600 rounded-full border-t-transparent animate-spin"></span>
+                                  ) : (
+                                    <FiXCircle size={18} />
+                                  )}
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
                   <tr>
                     <td
                       colSpan="6"
                       className="px-6 py-4 text-sm text-center text-gray-500"
                     >
-                      No transactions found.
+                      {debouncedSearchQuery || statusFilter !== "all"
+                        ? "No transactions match your filters."
+                        : "No transactions found."}
                     </td>
                   </tr>
                 )}
@@ -861,14 +727,29 @@ export default function AdminTransactions() {
                       Proof of Payment
                     </span>
                     {selectedTransaction.proofPaymentUrl ? (
-                      <a
-                        href={selectedTransaction.proofPaymentUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center text-blue-600 hover:underline"
-                      >
-                        View Payment Proof <FiExternalLink className="ml-1" />
-                      </a>
+                      <div>
+                        <a
+                          href={selectedTransaction.proofPaymentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center mb-2 text-blue-600 hover:underline"
+                        >
+                          View Payment Proof <FiExternalLink className="ml-1" />
+                        </a>
+
+                        <div className="w-full h-32 mt-2 overflow-hidden rounded-lg">
+                          <img
+                            src={selectedTransaction.proofPaymentUrl}
+                            alt="Payment Proof"
+                            className="object-cover w-full h-full"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src =
+                                "/images/placeholders/payment-placeholder.jpg";
+                            }}
+                          />
+                        </div>
+                      </div>
                     ) : (
                       <span className="text-red-500">No proof uploaded</span>
                     )}
@@ -988,8 +869,7 @@ export default function AdminTransactions() {
             </div>
 
             {/* Actions */}
-            {normalizeStatus(selectedTransaction.status) ===
-              "waiting-for-confirmation" && (
+            {selectedTransaction.status === "waiting-for-confirmation" && (
               <div className="flex justify-end mt-6 space-x-4">
                 <button
                   onClick={() =>
