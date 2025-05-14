@@ -1,58 +1,40 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import Link from "next/link";
 import {
   FiArrowLeft,
   FiSearch,
+  FiEdit,
+  FiFileText,
   FiClock,
   FiCheckCircle,
   FiXCircle,
-  FiInfo,
-  FiExternalLink,
   FiFilter,
-  FiEye,
-  FiDollarSign,
-  FiUser,
-  FiCalendar,
-  FiRefreshCw,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
-import { useTransaction } from "@/hooks/useTransaction";
+import { transactionService } from "@/lib/api";
 import { toast } from "react-toastify";
-import debounce from "lodash/debounce";
+import { normalizeStatus } from "@/lib/transaction-helpers";
 
 export default function AdminTransactions() {
   const { user, isAuthenticated, loading } = useAuth();
-  const {
-    transactions,
-    isLoading,
-    error,
-    updatingTransaction,
-    fetchAllTransactions,
-    updateTransactionStatus,
-    filterTransactionsByStatus,
-  } = useTransaction();
-
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
+  const [transactions, setTransactions] = useState([]);
   const [filteredTransactions, setFilteredTransactions] = useState([]);
-  const transactionsPerPage = 10;
-
-  // Debounced search function
-  const debouncedSetSearch = useCallback(
-    debounce((value) => {
-      setDebouncedSearchQuery(value);
-    }, 300),
-    []
-  );
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("pending");
+  const [totalCounts, setTotalCounts] = useState({
+    pending: 0,
+    "waiting-for-confirmation": 0,
+    success: 0,
+    failed: 0,
+    canceled: 0,
+    all: 0,
+  });
 
   // Auth check
   useEffect(() => {
@@ -63,79 +45,190 @@ export default function AdminTransactions() {
 
   // Fetch transactions
   useEffect(() => {
-    if (isAuthenticated && user?.role === "admin") {
-      fetchAllTransactions();
-    }
-  }, [isAuthenticated, user, fetchAllTransactions]);
+    const fetchTransactions = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
 
-  // Filter transactions when search or status filter changes
-  useEffect(() => {
-    // Create a function to filter transactions based on filters
-    const applyFilters = () => {
-      // First, filter by status
-      let results =
-        statusFilter === "all"
-          ? transactions
-          : filterTransactionsByStatus(statusFilter);
+        const response = await transactionService.getAllTransactions();
+        console.log("Admin transactions data:", response.data);
 
-      // Then apply search filter if needed
-      if (debouncedSearchQuery) {
-        const query = debouncedSearchQuery.toLowerCase();
+        if (!response.data || !response.data.data) {
+          throw new Error("Invalid response format from server");
+        }
 
-        results = results.filter((transaction) => {
-          const id = transaction.id?.toLowerCase() || "";
-          if (id.includes(query)) return true;
+        // Process transactions to ensure they have valid data
+        const processedTransactions = (response.data.data || []).map(
+          (transaction) => {
+            // Normalize status to handle inconsistencies
+            transaction.status = normalizeStatus(
+              transaction.status || "pending"
+            );
 
-          const userName = transaction.user?.name?.toLowerCase() || "";
-          const userEmail = transaction.user?.email?.toLowerCase() || "";
+            // If amount is missing or zero, calculate from cart items
+            if (!transaction.amount || transaction.amount === 0) {
+              // Check cart field
+              if (transaction.cart && transaction.cart.length > 0) {
+                let calculatedTotal = 0;
 
-          return userName.includes(query) || userEmail.includes(query);
-        });
+                transaction.cart.forEach((item) => {
+                  if (item.activity) {
+                    const price =
+                      item.activity.price_discount || item.activity.price || 0;
+                    const quantity = item.quantity || 1;
+                    calculatedTotal += parseInt(price) * parseInt(quantity);
+                  }
+                });
+
+                if (calculatedTotal > 0) {
+                  transaction.amount = calculatedTotal;
+                }
+              }
+              // Check transaction_items field as an alternative
+              else if (
+                transaction.transaction_items &&
+                transaction.transaction_items.length > 0
+              ) {
+                let calculatedTotal = 0;
+
+                transaction.transaction_items.forEach((item) => {
+                  const price = item.price_discount || item.price || 0;
+                  const quantity = item.quantity || 1;
+                  calculatedTotal += parseInt(price) * parseInt(quantity);
+                });
+
+                if (calculatedTotal > 0) {
+                  transaction.amount = calculatedTotal;
+                }
+              }
+
+              // Check totalAmount field
+              if (transaction.totalAmount && transaction.totalAmount > 0) {
+                transaction.amount = transaction.totalAmount;
+              }
+            }
+
+            // Get title from first cart item or set default
+            const title =
+              transaction.cart &&
+              transaction.cart.length > 0 &&
+              transaction.cart[0].activity
+                ? transaction.cart[0].activity.title
+                : transaction.transaction_items &&
+                  transaction.transaction_items.length > 0
+                ? transaction.transaction_items[0].title || "Unnamed Activity"
+                : "Unnamed Activity";
+
+            // Ensure payment method is available
+            const paymentMethod =
+              transaction.paymentMethod || transaction.payment_method || {};
+
+            return {
+              ...transaction,
+              title,
+              paymentMethodName: paymentMethod.name || "Unknown",
+              invoiceId:
+                transaction.invoiceId ||
+                `INV/${
+                  transaction.createdAt
+                    ? new Date(transaction.createdAt)
+                        .toISOString()
+                        .slice(0, 10)
+                        .replace(/-/g, "")
+                    : "00000000"
+                }/${transaction.id?.substring(0, 6) || "000000"}`,
+            };
+          }
+        );
+
+        // Calculate status counts
+        const counts = processedTransactions.reduce((acc, transaction) => {
+          const status = transaction.status || "pending";
+          acc[status] = (acc[status] || 0) + 1;
+          acc.all = (acc.all || 0) + 1;
+          return acc;
+        }, {});
+
+        setTotalCounts(counts);
+        setTransactions(processedTransactions);
+
+        // Apply initial filter based on active tab
+        filterTransactionsByStatus(processedTransactions, activeTab);
+      } catch (err) {
+        console.error("Error fetching transactions:", err);
+        setError(
+          `Failed to load transactions: ${err.message || "Unknown error"}`
+        );
+        toast.error("Failed to load transactions. Please try again later.");
+      } finally {
+        setIsLoading(false);
       }
-
-      return results;
     };
 
-    // Apply the filters
-    const filtered = applyFilters();
+    if (isAuthenticated && user?.role === "admin") {
+      fetchTransactions();
+    }
+  }, [isAuthenticated, user]);
+
+  // Filter transactions when tab or search changes
+  const filterTransactionsByStatus = (
+    allTransactions,
+    status,
+    query = searchQuery
+  ) => {
+    const filtered = allTransactions.filter((transaction) => {
+      // Status filter (for tab)
+      if (status !== "all" && transaction.status !== status) {
+        return false;
+      }
+
+      // Search query filter - skip if no query
+      if (query) {
+        const queryLower = query.toLowerCase();
+        // Search in ID, invoice ID, title, customer name, etc.
+        return (
+          (transaction.id || "").toLowerCase().includes(queryLower) ||
+          (transaction.invoiceId || "").toLowerCase().includes(queryLower) ||
+          (transaction.title || "").toLowerCase().includes(queryLower) ||
+          ((transaction.user?.name || "") + (transaction.user?.email || ""))
+            .toLowerCase()
+            .includes(queryLower)
+        );
+      }
+
+      return true;
+    });
+
     setFilteredTransactions(filtered);
+  };
 
-    // Always reset to first page when filters change
-    setCurrentPage(1);
-  }, [
-    debouncedSearchQuery,
-    statusFilter,
-    transactions,
-    filterTransactionsByStatus,
-  ]);
+  // Handle tab change
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    filterTransactionsByStatus(transactions, tab);
+  };
 
-  // Pagination
-  const indexOfLastTransaction = currentPage * transactionsPerPage;
-  const indexOfFirstTransaction = indexOfLastTransaction - transactionsPerPage;
-  const currentTransactions = filteredTransactions.slice(
-    indexOfFirstTransaction,
-    indexOfLastTransaction
-  );
-  const totalPages = Math.ceil(
-    filteredTransactions.length / transactionsPerPage
-  );
-
-  // Change page
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  // Handle search
+  const handleSearch = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    filterTransactionsByStatus(transactions, activeTab, query);
+  };
 
   // Format date
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
 
     try {
-      const options = {
-        year: "numeric",
-        month: "short",
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat("id-ID", {
+        weekday: "long",
         day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      };
-      return new Date(dateString).toLocaleDateString("en-US", options);
+        month: "long",
+        year: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+      }).format(date);
     } catch (e) {
       console.error("Date formatting error:", e);
       return "Invalid date";
@@ -150,76 +243,26 @@ export default function AdminTransactions() {
       const numValue = typeof value === "string" ? parseFloat(value) : value;
       return `Rp ${numValue.toLocaleString("id-ID")}`;
     } catch (e) {
-      console.error("Currency formatting error:", e, "Value:", value);
       return "Rp 0";
     }
   };
 
-  // Get status details
-  const getStatusDetails = (status) => {
-    if (!status)
-      return {
-        color: "text-gray-600 bg-gray-100",
-        icon: <FiInfo className="mr-2" />,
-        text: "Unknown",
-      };
+  // Go to transaction detail
+  const viewTransactionDetail = (id) => {
+    router.push(`/admin/transactions/${id}`);
+  };
 
-    const statusLower = status.toLowerCase();
+  // Retry loading transactions
+  const retryFetchTransactions = () => {
+    setIsLoading(true);
+    setError(null);
+    setActiveTab("pending");
+    setSearchQuery("");
 
-    switch (statusLower) {
-      case "waiting-for-payment":
-      case "pending":
-        return {
-          color: "text-yellow-600 bg-yellow-100",
-          icon: <FiClock className="mr-2" />,
-          text: "Waiting for Payment",
-        };
-      case "waiting-for-confirmation":
-        return {
-          color: "text-blue-600 bg-blue-100",
-          icon: <FiInfo className="mr-2" />,
-          text: "Waiting for Confirmation",
-        };
-      case "success":
-      case "completed":
-        return {
-          color: "text-green-600 bg-green-100",
-          icon: <FiCheckCircle className="mr-2" />,
-          text: "Success",
-        };
-      case "failed":
-        return {
-          color: "text-red-600 bg-red-100",
-          icon: <FiXCircle className="mr-2" />,
-          text: "Failed",
-        };
-      case "canceled":
-      case "cancelled":
-        return {
-          color: "text-gray-600 bg-gray-100",
-          icon: <FiXCircle className="mr-2" />,
-          text: "Canceled",
-        };
-      default:
-        return {
-          color: "text-gray-600 bg-gray-100",
-          icon: <FiInfo className="mr-2" />,
-          text: status,
-        };
+    // Re-fetch transactions
+    if (isAuthenticated && user?.role === "admin") {
+      fetchTransactions();
     }
-  };
-
-  // Handle status update
-  const handleUpdateStatus = async (id, status) => {
-    await updateTransactionStatus(id, status);
-    setIsModalOpen(false);
-    setSelectedTransaction(null);
-  };
-
-  // View transaction details
-  const viewTransactionDetails = (transaction) => {
-    setSelectedTransaction(transaction);
-    setIsModalOpen(true);
   };
 
   if (loading || isLoading) {
@@ -227,6 +270,39 @@ export default function AdminTransactions() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-2xl font-bold animate-pulse text-primary-600">
           Loading transactions...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-24 pb-16 bg-gray-50">
+        <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
+          <div className="mb-6">
+            <Link
+              href="/admin/dashboard"
+              className="flex items-center text-gray-600 transition-colors hover:text-primary-600"
+            >
+              <FiArrowLeft className="mr-2" /> Back to Dashboard
+            </Link>
+          </div>
+
+          <div className="p-8 mb-6 bg-white rounded-lg shadow">
+            <div className="flex flex-col items-center justify-center">
+              <FiXCircle className="w-16 h-16 mb-4 text-red-500" />
+              <h2 className="mb-2 text-2xl font-bold text-gray-800">
+                Error Loading Transactions
+              </h2>
+              <p className="mb-6 text-gray-600">{error}</p>
+              <button
+                onClick={retryFetchTransactions}
+                className="px-6 py-3 font-medium text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
+              >
+                Try Again
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -244,305 +320,263 @@ export default function AdminTransactions() {
           </Link>
         </div>
 
-        <h1 className="mb-6 text-2xl font-bold text-gray-900">
-          Manage Transactions
-        </h1>
+        <div className="mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">
+            Transaction Management
+          </h1>
+          <p className="text-gray-600">
+            Manage and monitor all transactions across different statuses
+          </p>
+        </div>
 
-        {/* Error message */}
-        {error && (
-          <div className="p-4 mb-6 text-red-700 bg-red-100 border border-red-300 rounded-lg">
-            <div className="flex items-center">
+        {/* Status Tabs */}
+        <div className="flex flex-wrap mb-6 space-x-2">
+          <button
+            onClick={() => handleTabChange("pending")}
+            className={`px-4 py-2 mb-2 rounded-full transition-colors ${
+              activeTab === "pending"
+                ? "bg-orange-500 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
+              <FiClock className="mr-2" />
+              Pending
+              {totalCounts.pending > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs bg-white text-orange-600 rounded-full">
+                  {totalCounts.pending}
+                </span>
+              )}
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange("waiting-for-confirmation")}
+            className={`px-4 py-2 mb-2 rounded-full transition-colors ${
+              activeTab === "waiting-for-confirmation"
+                ? "bg-blue-500 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
+              <FiClock className="mr-2" />
+              Waiting Confirmation
+              {totalCounts["waiting-for-confirmation"] > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs bg-white text-blue-600 rounded-full">
+                  {totalCounts["waiting-for-confirmation"]}
+                </span>
+              )}
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange("success")}
+            className={`px-4 py-2 mb-2 rounded-full transition-colors ${
+              activeTab === "success"
+                ? "bg-green-500 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
+              <FiCheckCircle className="mr-2" />
+              Success
+              {totalCounts.success > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs bg-white text-green-600 rounded-full">
+                  {totalCounts.success}
+                </span>
+              )}
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange("failed")}
+            className={`px-4 py-2 mb-2 rounded-full transition-colors ${
+              activeTab === "failed"
+                ? "bg-red-500 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
               <FiXCircle className="mr-2" />
-              <span>{error}</span>
-            </div>
-            <button
-              onClick={() => fetchAllTransactions()}
-              className="px-4 py-2 mt-2 text-white bg-red-600 rounded-lg hover:bg-red-700"
-            >
-              Try Again
-            </button>
-          </div>
-        )}
+              Failed
+              {totalCounts.failed > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs bg-white text-red-600 rounded-full">
+                  {totalCounts.failed}
+                </span>
+              )}
+            </span>
+          </button>
 
-        {/* Filters */}
-        <div className="flex flex-col mb-6 space-y-4 md:space-y-0 md:flex-row md:items-center md:justify-between">
-          <div className="relative flex-grow md:max-w-md">
+          <button
+            onClick={() => handleTabChange("canceled")}
+            className={`px-4 py-2 mb-2 rounded-full transition-colors ${
+              activeTab === "canceled"
+                ? "bg-gray-500 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
+              <FiXCircle className="mr-2" />
+              Canceled
+              {totalCounts.canceled > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs bg-white text-gray-600 rounded-full">
+                  {totalCounts.canceled}
+                </span>
+              )}
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleTabChange("all")}
+            className={`px-4 py-2 mb-2 rounded-full transition-colors ${
+              activeTab === "all"
+                ? "bg-gray-800 text-white"
+                : "bg-white text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
+              All
+              {totalCounts.all > 0 && (
+                <span className="ml-2 px-2 py-0.5 text-xs bg-white text-gray-800 rounded-full">
+                  {totalCounts.all}
+                </span>
+              )}
+            </span>
+          </button>
+        </div>
+
+        {/* Panel with title and count */}
+        <div className="p-6 mb-6 bg-white shadow-sm rounded-xl">
+          <h2 className="mb-2 text-xl font-bold text-gray-900">
+            {activeTab === "all"
+              ? "All Transactions"
+              : activeTab === "pending"
+              ? "Pending Transactions"
+              : activeTab === "waiting-for-confirmation"
+              ? "Waiting for Confirmation"
+              : activeTab === "success"
+              ? "Successful Transactions"
+              : activeTab === "failed"
+              ? "Failed Transactions"
+              : "Canceled Transactions"}
+          </h2>
+          <p className="mb-4 text-gray-600">
+            Total: {filteredTransactions.length} transactions
+          </p>
+
+          {/* Search box */}
+          <div className="relative mb-6">
             <FiSearch className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
             <input
               type="text"
-              placeholder="Search by ID or customer..."
+              placeholder="Search by ID, title, or customer..."
               className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                debouncedSetSearch(e.target.value);
-              }}
+              onChange={handleSearch}
             />
           </div>
 
-          <div className="flex items-center space-x-4">
-            <div className="flex items-center space-x-2">
-              <FiFilter className="text-gray-500" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="all">All Statuses</option>
-                <option value="waiting-for-payment">Waiting for Payment</option>
-                <option value="waiting-for-confirmation">
-                  Waiting for Confirmation
-                </option>
-                <option value="success">Success</option>
-                <option value="failed">Failed</option>
-                <option value="canceled">Canceled</option>
-              </select>
-            </div>
-
-            <button
-              onClick={() => fetchAllTransactions()}
-              className="flex items-center px-3 py-2 text-gray-600 transition-colors bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              title="Refresh transactions"
-            >
-              <FiRefreshCw size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Status summary */}
-        <div className="grid grid-cols-2 gap-4 mb-6 md:grid-cols-5">
-          <div
-            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
-            onClick={() => setStatusFilter("all")}
-          >
-            <div className="text-sm text-gray-500">All</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {transactions.length}
-            </div>
-          </div>
-
-          <div
-            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
-            onClick={() => setStatusFilter("waiting-for-payment")}
-          >
-            <div className="text-sm text-yellow-600">Pending</div>
-            <div className="text-2xl font-bold text-yellow-600">
-              {filterTransactionsByStatus("waiting-for-payment").length}
-            </div>
-          </div>
-
-          <div
-            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
-            onClick={() => setStatusFilter("waiting-for-confirmation")}
-          >
-            <div className="text-sm text-blue-600">Waiting Confirmation</div>
-            <div className="text-2xl font-bold text-blue-600">
-              {filterTransactionsByStatus("waiting-for-confirmation").length}
-            </div>
-          </div>
-
-          <div
-            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
-            onClick={() => setStatusFilter("success")}
-          >
-            <div className="text-sm text-green-600">Successful</div>
-            <div className="text-2xl font-bold text-green-600">
-              {filterTransactionsByStatus("success").length}
-            </div>
-          </div>
-
-          <div
-            className="p-4 transition-shadow bg-white rounded-lg shadow-sm cursor-pointer hover:shadow-md"
-            onClick={() => setStatusFilter("failed")}
-          >
-            <div className="text-sm text-red-600">Failed/Canceled</div>
-            <div className="text-2xl font-bold text-red-600">
-              {filterTransactionsByStatus("failed").length +
-                filterTransactionsByStatus("canceled").length}
-            </div>
-          </div>
-        </div>
-
-        {/* Transaction list */}
-        <div className="overflow-hidden bg-white shadow-sm rounded-xl">
+          {/* Transaction table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                  >
-                    ID
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase border-b">
+                    Invoice ID
                   </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                  >
-                    Customer
+                  <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase border-b">
+                    Title
                   </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                  >
-                    Amount
+                  <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase border-b">
+                    Payment Method
                   </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                  >
+                  <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase border-b">
+                    Total Amount
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase border-b">
+                    Order Date
+                  </th>
+                  <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase border-b">
                     Status
                   </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                  >
-                    Date
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                  >
+                  <th className="px-4 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase border-b">
                     Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {currentTransactions.length > 0 ? (
-                  currentTransactions.map((transaction) => {
-                    const statusDetails = getStatusDetails(transaction?.status);
-                    const shortId =
-                      transaction.id?.substring(0, 8) || "unknown";
-
-                    return (
-                      <tr key={transaction.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                          #{shortId}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="w-8 h-8 mr-3 overflow-hidden rounded-full">
-                              <img
-                                src={
-                                  transaction.user?.profilePictureUrl ||
-                                  "/images/placeholders/user-placeholder.jpg"
-                                }
-                                alt={transaction.user?.name || "User"}
-                                className="object-cover w-full h-full"
-                                onError={(e) => {
-                                  e.target.onerror = null;
-                                  e.target.src =
-                                    "/images/placeholders/user-placeholder.jpg";
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <div className="font-medium">
-                                {transaction.user?.name || "Unknown user"}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {transaction.user?.email || "No email"}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                          {formatCurrency(
-                            transaction.amount || transaction.totalAmount
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusDetails.color}`}
-                          >
-                            {statusDetails.icon} {statusDetails.text}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                          {formatDate(transaction.createdAt)}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
-                          <div className="flex items-center space-x-2">
-                            <button
-                              onClick={() =>
-                                viewTransactionDetails(transaction)
-                              }
-                              className="p-1 text-blue-600 transition-colors rounded-md hover:bg-blue-50"
-                              title="View details"
-                            >
-                              <FiEye size={18} />
-                            </button>
-
-                            <Link
-                              href={`/transaction/${transaction.id}`}
-                              className="p-1 text-green-600 transition-colors rounded-md hover:bg-green-50"
-                              title="View transaction page"
-                            >
-                              <FiExternalLink size={18} />
-                            </Link>
-
-                            {transaction.status ===
-                              "waiting-for-confirmation" && (
-                              <>
-                                <button
-                                  onClick={() =>
-                                    handleUpdateStatus(
-                                      transaction.id,
-                                      "success"
-                                    )
-                                  }
-                                  disabled={
-                                    updatingTransaction === transaction.id
-                                  }
-                                  className={`p-1 text-green-600 transition-colors rounded-md ${
-                                    updatingTransaction === transaction.id
-                                      ? "opacity-50 cursor-not-allowed"
-                                      : "hover:bg-green-50"
-                                  }`}
-                                  title="Approve payment"
-                                >
-                                  {updatingTransaction === transaction.id ? (
-                                    <span className="inline-block w-4 h-4 border-2 border-green-600 rounded-full border-t-transparent animate-spin"></span>
-                                  ) : (
-                                    <FiCheckCircle size={18} />
-                                  )}
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    handleUpdateStatus(transaction.id, "failed")
-                                  }
-                                  disabled={
-                                    updatingTransaction === transaction.id
-                                  }
-                                  className={`p-1 text-red-600 transition-colors rounded-md ${
-                                    updatingTransaction === transaction.id
-                                      ? "opacity-50 cursor-not-allowed"
-                                      : "hover:bg-red-50"
-                                  }`}
-                                  title="Reject payment"
-                                >
-                                  {updatingTransaction === transaction.id ? (
-                                    <span className="inline-block w-4 h-4 border-2 border-red-600 rounded-full border-t-transparent animate-spin"></span>
-                                  ) : (
-                                    <FiXCircle size={18} />
-                                  )}
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
+                {filteredTransactions.length > 0 ? (
+                  filteredTransactions.map((transaction) => (
+                    <tr
+                      key={transaction.id}
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => viewTransactionDetail(transaction.id)}
+                    >
+                      <td className="px-4 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        {transaction.invoiceId}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-900">
+                        <div className="max-w-xs truncate">
+                          {transaction.title}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        {transaction.paymentMethodName}
+                      </td>
+                      <td className="px-4 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
+                        {formatCurrency(
+                          transaction.amount || transaction.totalAmount
+                        )}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-900 whitespace-nowrap">
+                        {formatDate(transaction.createdAt)}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span
+                          className={`inline-flex px-2.5 py-0.5 text-xs font-medium rounded-full ${
+                            transaction.status === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : transaction.status ===
+                                "waiting-for-confirmation"
+                              ? "bg-blue-100 text-blue-800"
+                              : transaction.status === "success"
+                              ? "bg-green-100 text-green-800"
+                              : transaction.status === "failed"
+                              ? "bg-red-100 text-red-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {transaction.status === "pending"
+                            ? "Pending"
+                            : transaction.status === "waiting-for-confirmation"
+                            ? "Waiting for Confirmation"
+                            : transaction.status === "success"
+                            ? "Success"
+                            : transaction.status === "failed"
+                            ? "Failed"
+                            : "Canceled"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-500 whitespace-nowrap">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            viewTransactionDetail(transaction.id);
+                          }}
+                          className="p-2 text-orange-500 transition-colors rounded-full hover:bg-orange-50"
+                        >
+                          <FiEdit size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
                 ) : (
                   <tr>
                     <td
-                      colSpan="6"
-                      className="px-6 py-4 text-sm text-center text-gray-500"
+                      colSpan="7"
+                      className="px-4 py-6 text-sm text-center text-gray-500"
                     >
-                      {debouncedSearchQuery || statusFilter !== "all"
-                        ? "No transactions match your filters."
-                        : "No transactions found."}
+                      No transactions found.
                     </td>
                   </tr>
                 )}
@@ -550,378 +584,7 @@ export default function AdminTransactions() {
             </table>
           </div>
         </div>
-
-        {/* Improved Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center mt-6 space-x-2">
-            <button
-              onClick={() => paginate(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1 rounded-md ${
-                currentPage === 1
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              Previous
-            </button>
-
-            {/* Logic for showing limited page numbers */}
-            {Array.from({ length: totalPages }, (_, i) => {
-              const pageNumber = i + 1;
-              // Show first page, last page, current page, and pages adjacent to current page
-              if (
-                pageNumber === 1 ||
-                pageNumber === totalPages ||
-                (pageNumber >= currentPage - 2 && pageNumber <= currentPage + 2)
-              ) {
-                return (
-                  <button
-                    key={pageNumber}
-                    onClick={() => paginate(pageNumber)}
-                    className={`px-3 py-1 rounded-md ${
-                      currentPage === pageNumber
-                        ? "bg-primary-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                    }`}
-                  >
-                    {pageNumber}
-                  </button>
-                );
-              }
-
-              // Show ellipsis for skipped pages
-              if (
-                (pageNumber === currentPage - 3 && pageNumber > 1) ||
-                (pageNumber === currentPage + 3 && pageNumber < totalPages)
-              ) {
-                return (
-                  <span key={pageNumber} className="px-3 py-1">
-                    ...
-                  </span>
-                );
-              }
-
-              return null;
-            })}
-
-            <button
-              onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1 rounded-md ${
-                currentPage === totalPages
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              }`}
-            >
-              Next
-            </button>
-          </div>
-        )}
       </div>
-
-      {/* Transaction details modal */}
-      {isModalOpen && selectedTransaction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="w-full max-w-4xl p-6 bg-white rounded-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                Transaction Details
-              </h2>
-              <button
-                onClick={() => {
-                  setIsModalOpen(false);
-                  setSelectedTransaction(null);
-                }}
-                className="p-2 text-gray-500 transition-colors rounded-full hover:bg-gray-100"
-              >
-                <FiXCircle size={20} />
-              </button>
-            </div>
-
-            <div className="p-4 mb-4 border rounded-lg bg-gray-50">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                <div>
-                  <div className="text-sm text-gray-500">Transaction ID</div>
-                  <div className="font-medium">{selectedTransaction.id}</div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Date</div>
-                  <div className="font-medium">
-                    {formatDate(selectedTransaction.createdAt)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-500">Status</div>
-                  <div>
-                    <span
-                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        getStatusDetails(selectedTransaction.status).color
-                      }`}
-                    >
-                      {getStatusDetails(selectedTransaction.status).icon}
-                      {getStatusDetails(selectedTransaction.status).text}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {/* Customer info */}
-              <div className="p-4 border rounded-lg">
-                <h3 className="flex items-center mb-3 text-lg font-medium text-gray-900">
-                  <FiUser className="mr-2" />
-                  Customer Information
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500">Name</span>
-                    <span className="font-medium">
-                      {selectedTransaction.user?.name || "N/A"}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500">Email</span>
-                    <span className="font-medium">
-                      {selectedTransaction.user?.email || "N/A"}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500">Phone</span>
-                    <span className="font-medium">
-                      {selectedTransaction.user?.phoneNumber || "N/A"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Payment details */}
-              <div className="p-4 border rounded-lg">
-                <h3 className="flex items-center mb-3 text-lg font-medium text-gray-900">
-                  <FiDollarSign className="mr-2" />
-                  Payment Details
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500">Amount</span>
-                    <span className="text-xl font-bold text-primary-600">
-                      {formatCurrency(
-                        selectedTransaction.amount ||
-                          selectedTransaction.totalAmount
-                      )}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500">
-                      Payment Method
-                    </span>
-                    <span className="font-medium">
-                      {selectedTransaction.paymentMethod?.name ||
-                        selectedTransaction.payment_method?.name ||
-                        "N/A"}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-sm text-gray-500">
-                      Proof of Payment
-                    </span>
-                    {selectedTransaction.proofPaymentUrl ? (
-                      <div>
-                        <a
-                          href={selectedTransaction.proofPaymentUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center mb-2 text-blue-600 hover:underline"
-                        >
-                          View Payment Proof <FiExternalLink className="ml-1" />
-                        </a>
-
-                        <div className="w-full h-32 mt-2 overflow-hidden rounded-lg">
-                          <img
-                            src={selectedTransaction.proofPaymentUrl}
-                            alt="Payment Proof"
-                            className="object-cover w-full h-full"
-                            onError={(e) => {
-                              e.target.onerror = null;
-                              e.target.src =
-                                "/images/placeholders/payment-placeholder.jpg";
-                            }}
-                          />
-                        </div>
-                      </div>
-                    ) : (
-                      <span className="text-red-500">No proof uploaded</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Items */}
-            <div className="mt-6">
-              <h3 className="mb-3 text-lg font-medium text-gray-900">
-                Items (
-                {selectedTransaction.cart?.length ||
-                  selectedTransaction.transaction_items?.length ||
-                  0}
-                )
-              </h3>
-              <div className="overflow-hidden border rounded-lg">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                      >
-                        Item
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                      >
-                        Price
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                      >
-                        Quantity
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase"
-                      >
-                        Total
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {(
-                      selectedTransaction.cart ||
-                      selectedTransaction.transaction_items ||
-                      []
-                    ).map((item, index) => {
-                      // Handle different data structures
-                      const activityData = item.activity || item;
-                      const price =
-                        activityData.price_discount || activityData.price || 0;
-                      const quantity = item.quantity || 1;
-                      const itemTotal = price * quantity;
-                      const imageUrl =
-                        Array.isArray(activityData.imageUrls) &&
-                        activityData.imageUrls.length > 0
-                          ? activityData.imageUrls[0]
-                          : activityData.imageUrl ||
-                            "/images/placeholders/activity-placeholder.jpg";
-
-                      return (
-                        <tr key={item.id || index}>
-                          <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="w-10 h-10 mr-3 overflow-hidden rounded-lg">
-                                <img
-                                  src={imageUrl}
-                                  alt={activityData.title || "Activity"}
-                                  className="object-cover w-full h-full"
-                                  onError={(e) => {
-                                    e.target.onerror = null;
-                                    e.target.src =
-                                      "/images/placeholders/activity-placeholder.jpg";
-                                  }}
-                                />
-                              </div>
-                              <div className="font-medium">
-                                {activityData.title || "Unknown Activity"}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                            {formatCurrency(price)}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
-                            {quantity}
-                          </td>
-                          <td className="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                            {formatCurrency(itemTotal)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-
-                    {(!selectedTransaction.cart ||
-                      selectedTransaction.cart.length === 0) &&
-                      (!selectedTransaction.transaction_items ||
-                        selectedTransaction.transaction_items.length === 0) && (
-                        <tr>
-                          <td
-                            colSpan="4"
-                            className="px-6 py-4 text-sm text-center text-gray-500"
-                          >
-                            No items found.
-                          </td>
-                        </tr>
-                      )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Actions */}
-            {selectedTransaction.status === "waiting-for-confirmation" && (
-              <div className="flex justify-end mt-6 space-x-4">
-                <button
-                  onClick={() =>
-                    handleUpdateStatus(selectedTransaction.id, "failed")
-                  }
-                  disabled={updatingTransaction === selectedTransaction.id}
-                  className={`px-4 py-2 text-white transition-colors rounded-lg ${
-                    updatingTransaction === selectedTransaction.id
-                      ? "bg-red-400 cursor-not-allowed"
-                      : "bg-red-600 hover:bg-red-700"
-                  }`}
-                >
-                  {updatingTransaction === selectedTransaction.id ? (
-                    <>
-                      <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <FiXCircle className="inline-block mr-2" />
-                      Reject Payment
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() =>
-                    handleUpdateStatus(selectedTransaction.id, "success")
-                  }
-                  disabled={updatingTransaction === selectedTransaction.id}
-                  className={`px-4 py-2 text-white transition-colors rounded-lg ${
-                    updatingTransaction === selectedTransaction.id
-                      ? "bg-green-400 cursor-not-allowed"
-                      : "bg-green-600 hover:bg-green-700"
-                  }`}
-                >
-                  {updatingTransaction === selectedTransaction.id ? (
-                    <>
-                      <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
-                      Processing...
-                    </>
-                  ) : (
-                    <>
-                      <FiCheckCircle className="inline-block mr-2" />
-                      Approve Payment
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

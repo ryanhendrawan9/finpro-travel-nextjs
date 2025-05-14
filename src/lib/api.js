@@ -43,7 +43,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for handling common errors
+// Response interceptor for handling common errors - MODIFIED FOR PROFILE UPDATE
 api.interceptors.response.use(
   (response) => {
     if (
@@ -362,6 +362,7 @@ export const transactionService = {
   },
 
   getAllTransactions: () => {
+    console.log("Fetching all transactions");
     return api.get("/api/v1/all-transactions").catch((error) => {
       console.warn("Failed to fetch all transactions:", error.message);
       return createFallbackResponse("Failed to fetch all transactions");
@@ -394,6 +395,7 @@ export const transactionService = {
   },
 
   cancel: (id) => {
+    console.log(`Canceling transaction with ID: ${id}`);
     return api.post(`/api/v1/cancel-transaction/${id}`).catch((error) => {
       console.warn(`Failed to cancel transaction ${id}:`, error.message);
       throw error; // Re-throw to let component handle it
@@ -401,6 +403,7 @@ export const transactionService = {
   },
 
   updateProofPayment: (id, data) => {
+    console.log(`Updating proof payment for transaction ${id}:`, data);
     // Validate proof payment URL before sending
     if (!data.proofPaymentUrl || !data.proofPaymentUrl.trim()) {
       return Promise.reject(new Error("Payment proof URL is required"));
@@ -417,74 +420,44 @@ export const transactionService = {
       });
   },
 
-  // Enhanced method that handles file uploads directly
-  uploadPaymentProof: async (id, fileOrUrl) => {
-    if (!id) {
-      return Promise.reject(new Error("Transaction ID is required"));
+  updateStatus: async (id, data) => {
+    console.log(`Updating transaction status for ID: ${id}, data:`, data);
+
+    // Validasi data sebelum dikirim
+    if (!data.status) {
+      console.error("Missing status in update request");
+      return Promise.reject(new Error("Status is required"));
     }
 
     try {
-      // Check if we're dealing with a file object or URL string
-      if (typeof fileOrUrl === "object" && fileOrUrl instanceof File) {
-        // It's a file, so we need to upload it first
-        const formData = new FormData();
-        formData.append("image", fileOrUrl);
+      // Format status yang sesuai dengan API
+      let statusToSend = data.status;
 
-        // Upload the file
-        const uploadResponse = await uploadService.uploadImage(formData);
-        const imageUrl = uploadResponse.data.data.imageUrl;
-
-        // Then update the transaction with the image URL
-        return api.post(`/api/v1/update-transaction-proof-payment/${id}`, {
-          proofPaymentUrl: imageUrl,
-        });
-      } else if (typeof fileOrUrl === "string") {
-        // It's already a URL, just update the transaction
-        return api.post(`/api/v1/update-transaction-proof-payment/${id}`, {
-          proofPaymentUrl: fileOrUrl,
-        });
-      } else {
-        throw new Error("Invalid payment proof format");
-      }
-    } catch (error) {
-      console.warn(
-        `Failed to upload payment proof for transaction ${id}:`,
-        error.message
+      // Kirim data sesuai format yang diharapkan API
+      const response = await api.post(
+        `/api/v1/update-transaction-status/${id}`,
+        {
+          status: statusToSend,
+        }
       );
+
+      console.log("Status update response:", response.data);
+      return response;
+    } catch (error) {
+      // Log error secara detail untuk debugging
+      console.error("API Error Details:", {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        config: {
+          url: error.config?.url,
+          method: error.config?.method,
+          data: error.config?.data,
+        },
+      });
+
       throw error;
     }
-  },
-
-  updateStatus: (id, data) => {
-    // Validate status value before sending
-    if (
-      !data.status ||
-      ![
-        "success",
-        "failed",
-        "waiting-for-confirmation",
-        "waiting-for-payment",
-        "canceled",
-      ].includes(data.status)
-    ) {
-      return Promise.reject(new Error("Invalid transaction status"));
-    }
-
-    return api
-      .post(`/api/v1/update-transaction-status/${id}`, data)
-      .then((response) => {
-        console.log(
-          `Successfully updated transaction ${id} status to ${data.status}`
-        );
-        return response;
-      })
-      .catch((error) => {
-        console.warn(
-          `Failed to update status for transaction ${id}:`,
-          error.message
-        );
-        throw error; // Re-throw to let component handle it
-      });
   },
 };
 
@@ -494,29 +467,13 @@ export const paymentMethodService = {
   generate: () => api.post("/api/v1/generate-payment-methods"),
 };
 
-// Upload service with better error handling and progress tracking
+// Upload service
 export const uploadService = {
-  uploadImage: (formData, progressCallback) => {
-    const config = {
+  uploadImage: (formData) => {
+    return api.post("/api/v1/upload-image", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
-    };
-
-    // Add progress tracking if callback provided
-    if (typeof progressCallback === "function") {
-      config.onUploadProgress = progressCallback;
-    } else {
-      // Default progress tracker
-      config.onUploadProgress = (progressEvent) => {
-        const percentCompleted = Math.round(
-          (progressEvent.loaded * 100) / progressEvent.total
-        );
-        // Log progress to console
-        console.log(`Upload progress: ${percentCompleted}%`);
-      };
-    }
-
-    return api.post("/api/v1/upload-image", formData, config);
+    });
   },
 };

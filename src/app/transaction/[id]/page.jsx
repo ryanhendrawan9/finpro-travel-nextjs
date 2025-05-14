@@ -16,45 +16,181 @@ import {
   FiAlertCircle,
   FiDollarSign,
   FiUser,
-  FiEye,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
-import { useTransaction } from "@/hooks/useTransaction";
-import FileUploader from "@/components/upload/FileUploader";
-import ImageViewer from "@/components/ui/ImageViewer";
+import { transactionService } from "@/lib/api";
 import { toast } from "react-toastify";
 
 export default function TransactionDetailPage({ params }) {
   const id = use(params).id;
+  const [transaction, setTransaction] = useState(null);
+  const [calculatedAmount, setCalculatedAmount] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [proofPaymentUrl, setProofPaymentUrl] = useState("");
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
   const { isAuthenticated, user } = useAuth();
-  const {
-    transaction,
-    isLoading,
-    error,
-    updatingTransaction,
-    isUploading,
-    fetchTransaction,
-    updateTransactionStatus,
-    uploadPaymentProof,
-    cancelTransaction,
-  } = useTransaction();
-  const [showUploadModal, setShowUploadModal] = useState(false);
-  const [showImageViewer, setShowImageViewer] = useState(false);
   const router = useRouter();
 
   // Redirect to login if not authenticated
   useEffect(() => {
-    if (!isAuthenticated && !isLoading) {
+    if (!isAuthenticated && !loading) {
       router.push("/login");
     }
-  }, [isAuthenticated, isLoading, router]);
+  }, [isAuthenticated, loading, router]);
 
   // Fetch transaction data
   useEffect(() => {
+    const fetchTransaction = async () => {
+      try {
+        const response = await transactionService.getById(id);
+        console.log("Transaction data received:", response.data.data);
+
+        let transactionData = response.data.data;
+
+        // Handle different response structures
+        // Compatibility with both response formats
+        const cartItems =
+          transactionData.transaction_items || transactionData.cart || [];
+
+        // Normalize transaction items structure
+        const normalizedItems = cartItems.map((item) => {
+          // If item already has an activity property, use it
+          if (item.activity) return item;
+
+          // Otherwise, construct an activity object from the item itself
+          return {
+            id: item.id,
+            quantity: item.quantity || 1,
+            activity: {
+              id: item.id,
+              title: item.title || "Unnamed Activity",
+              price: item.price || 0,
+              price_discount: item.price_discount || null,
+              imageUrls: Array.isArray(item.imageUrls)
+                ? item.imageUrls
+                : item.imageUrl
+                ? [item.imageUrl]
+                : [],
+              description: item.description || "",
+              city: item.city || "",
+              province: item.province || "",
+            },
+          };
+        });
+
+        // Update the transaction object with the normalized items
+        transactionData = {
+          ...transactionData,
+          cart: normalizedItems,
+          // Ensure other essential fields exist
+          status: transactionData.status || "pending",
+          proofPaymentUrl: transactionData.proofPaymentUrl || null,
+          amount: transactionData.amount || transactionData.totalAmount || 0,
+          paymentMethod:
+            transactionData.payment_method ||
+            transactionData.paymentMethod ||
+            {},
+        };
+
+        // Calculate amount from items if needed
+        if (!transactionData.amount || transactionData.amount === 0) {
+          let calculatedTotal = 0;
+
+          normalizedItems.forEach((item) => {
+            let price = 0;
+            if (item.activity) {
+              price = item.activity.price_discount || item.activity.price || 0;
+            } else {
+              price = item.price_discount || item.price || 0;
+            }
+
+            // Convert price to number if it's a string
+            const numericPrice =
+              typeof price === "string" ? parseFloat(price) : price;
+
+            // Get quantity (default to 1)
+            const quantity = parseInt(item.quantity) || 1;
+
+            // Add to total
+            calculatedTotal += numericPrice * quantity;
+          });
+
+          console.log("Calculated amount from items:", calculatedTotal);
+          setCalculatedAmount(calculatedTotal);
+
+          // Only update if we calculated something positive
+          if (calculatedTotal > 0) {
+            transactionData.amount = calculatedTotal;
+          }
+        }
+
+        setTransaction(transactionData);
+        setProofPaymentUrl(transactionData?.proofPaymentUrl || "");
+      } catch (err) {
+        console.error("Error fetching transaction:", err);
+        setError("Failed to load transaction details. Please try again later.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (id && isAuthenticated) {
-      fetchTransaction(id);
+      fetchTransaction();
     }
-  }, [id, isAuthenticated, fetchTransaction]);
+  }, [id, isAuthenticated]);
+
+  // Handle proof payment upload
+  const handleProofPaymentSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!proofPaymentUrl) {
+      setUploadError("Please enter a valid payment proof URL");
+      return;
+    }
+
+    setUploadLoading(true);
+    setUploadError(null);
+
+    try {
+      await transactionService.updateProofPayment(id, { proofPaymentUrl });
+
+      // Update transaction status
+      const updatedTransaction = {
+        ...transaction,
+        proofPaymentUrl,
+        status: "waiting-for-confirmation",
+      };
+      setTransaction(updatedTransaction);
+
+      toast.success("Payment proof uploaded successfully!");
+    } catch (err) {
+      console.error("Error uploading proof payment:", err);
+      setUploadError("Failed to upload payment proof. Please try again.");
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  // Handle cancel transaction
+  const handleCancelTransaction = async () => {
+    if (!confirm("Are you sure you want to cancel this transaction?")) {
+      return;
+    }
+
+    try {
+      await transactionService.cancel(id);
+
+      // Update transaction state
+      setTransaction({ ...transaction, status: "canceled" });
+
+      toast.success("Transaction canceled successfully");
+    } catch (err) {
+      console.error("Error canceling transaction:", err);
+      toast.error("Failed to cancel transaction");
+    }
+  };
 
   // Format date safely
   const formatDate = (dateString) => {
@@ -77,6 +213,14 @@ export default function TransactionDetailPage({ params }) {
 
   // Safely format currency
   const formatCurrency = (value) => {
+    // If value is missing but we have a calculated amount, use that
+    if (
+      (value === undefined || value === null || value === 0) &&
+      calculatedAmount > 0
+    ) {
+      return `Rp ${calculatedAmount.toLocaleString("id-ID")}`;
+    }
+
     if (value === undefined || value === null) {
       return "Rp 0";
     }
@@ -156,40 +300,7 @@ export default function TransactionDetailPage({ params }) {
     }
   };
 
-  // Handle file upload completion
-  const handleFileUploaded = async (fileData) => {
-    if (fileData && fileData.imageUrl) {
-      try {
-        // Use the transaction hook to update the proof payment
-        await uploadPaymentProof(id, fileData.imageUrl);
-        setShowUploadModal(false);
-
-        // Reload the transaction to show updated data
-        setTimeout(() => {
-          fetchTransaction(id);
-        }, 500);
-      } catch (error) {
-        console.error("Error updating proof payment:", error);
-        toast.error("Failed to update payment proof. Please try again.");
-      }
-    }
-  };
-
-  // Handle cancel transaction
-  const handleCancelTransaction = async () => {
-    if (!confirm("Are you sure you want to cancel this transaction?")) {
-      return;
-    }
-
-    await cancelTransaction(id);
-  };
-
-  // Handle approve/reject payment (admin only)
-  const handleUpdateStatus = async (status) => {
-    await updateTransactionStatus(id, status);
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-2xl font-bold animate-pulse text-primary-600">
@@ -215,17 +326,17 @@ export default function TransactionDetailPage({ params }) {
     );
   }
 
-  // Destructure transaction data
+  // Destructure with fallbacks for all fields
   const {
-    id: transactionId,
-    amount,
-    status,
+    id: transactionId = id,
+    amount = calculatedAmount,
+    status = "pending",
     createdAt,
     updatedAt,
-    proofPaymentUrl,
+    proofPaymentUrl: currentProofUrl = null,
     paymentMethod = {},
     cart = [],
-    user: transactionUser,
+    user: transactionUser = {},
     promoDiscount = 0,
     promoCode = null,
   } = transaction;
@@ -378,46 +489,20 @@ export default function TransactionDetailPage({ params }) {
                     Payment Proof
                   </h4>
 
-                  {proofPaymentUrl ? (
-                    <div className="p-3 rounded-lg bg-gray-50">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm text-gray-600">
-                          Payment proof uploaded
-                        </span>
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => setShowImageViewer(true)}
-                            className="flex items-center text-blue-600 hover:text-blue-700"
-                          >
-                            <FiEye className="mr-1" />
-                            View
-                          </button>
-                          <a
-                            href={proofPaymentUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center text-blue-600 hover:text-blue-700"
-                          >
-                            <FiDownload className="mr-1" />
-                            Download
-                          </a>
-                        </div>
+                  {currentProofUrl ? (
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                      <div className="truncate max-w-[200px]">
+                        {currentProofUrl}
                       </div>
-                      <div
-                        className="w-full h-32 overflow-hidden rounded-lg cursor-pointer"
-                        onClick={() => setShowImageViewer(true)}
+                      <a
+                        href={currentProofUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center ml-2 text-primary-600 hover:text-primary-700"
                       >
-                        <img
-                          src={proofPaymentUrl}
-                          alt="Payment Proof"
-                          className="object-cover w-full h-full"
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src =
-                              "/images/placeholders/payment-placeholder.jpg";
-                          }}
-                        />
-                      </div>
+                        <FiDownload className="mr-1" />
+                        View
+                      </a>
                     </div>
                   ) : (
                     <div className="p-3 text-sm italic text-gray-500 rounded-lg bg-gray-50">
@@ -492,13 +577,76 @@ export default function TransactionDetailPage({ params }) {
                   </div>
                 )}
 
-                <button
-                  onClick={() => setShowUploadModal(true)}
-                  className="flex items-center justify-center w-full px-4 py-3 font-medium text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
-                >
-                  <FiUpload className="mr-2" />
-                  Upload Payment Proof
-                </button>
+                <form onSubmit={handleProofPaymentSubmit}>
+                  <div className="mb-3">
+                    <label
+                      htmlFor="proofPaymentUrl"
+                      className="block mb-1 text-sm font-medium text-gray-700"
+                    >
+                      Payment Proof URL
+                    </label>
+                    <input
+                      type="url"
+                      id="proofPaymentUrl"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      placeholder="https://example.com/payment-proof.jpg"
+                      value={proofPaymentUrl}
+                      onChange={(e) => setProofPaymentUrl(e.target.value)}
+                      required
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Upload your payment proof to an image hosting service and
+                      paste the URL here
+                    </p>
+                  </div>
+
+                  {uploadError && (
+                    <div className="mb-3 text-sm text-red-600">
+                      {uploadError}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={uploadLoading}
+                    className={`flex items-center justify-center w-full py-2 px-4 rounded-lg text-white font-medium transition-colors ${
+                      uploadLoading
+                        ? "bg-gray-400 cursor-not-allowed"
+                        : "bg-primary-600 hover:bg-primary-700"
+                    }`}
+                  >
+                    {uploadLoading ? (
+                      <>
+                        <svg
+                          className="w-5 h-5 mr-3 -ml-1 text-white animate-spin"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Uploading...
+                      </>
+                    ) : (
+                      <>
+                        <FiUpload className="mr-2" />
+                        Upload Payment Proof
+                      </>
+                    )}
+                  </button>
+                </form>
               </div>
             )}
 
@@ -660,46 +808,30 @@ export default function TransactionDetailPage({ params }) {
               {isAdmin && status === "waiting-for-confirmation" && (
                 <div className="flex justify-end gap-3 mt-4">
                   <button
-                    onClick={() => handleUpdateStatus("failed")}
-                    disabled={updatingTransaction === transactionId}
-                    className={`px-4 py-2 text-white transition-colors rounded-lg ${
-                      updatingTransaction === transactionId
-                        ? "bg-red-400 cursor-not-allowed"
-                        : "bg-red-600 hover:bg-red-700"
-                    }`}
+                    onClick={async () => {
+                      await transactionService.updateStatus(transactionId, {
+                        status: "failed",
+                      });
+                      setTransaction({ ...transaction, status: "failed" });
+                      toast.success("Transaction marked as failed");
+                    }}
+                    className="px-4 py-2 text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700"
                   >
-                    {updatingTransaction === transactionId ? (
-                      <>
-                        <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <FiXCircle className="inline-block mr-2" />
-                        Reject Payment
-                      </>
-                    )}
+                    <FiXCircle className="inline-block mr-2" />
+                    Reject Payment
                   </button>
                   <button
-                    onClick={() => handleUpdateStatus("success")}
-                    disabled={updatingTransaction === transactionId}
-                    className={`px-4 py-2 text-white transition-colors rounded-lg ${
-                      updatingTransaction === transactionId
-                        ? "bg-green-400 cursor-not-allowed"
-                        : "bg-green-600 hover:bg-green-700"
-                    }`}
+                    onClick={async () => {
+                      await transactionService.updateStatus(transactionId, {
+                        status: "success",
+                      });
+                      setTransaction({ ...transaction, status: "success" });
+                      toast.success("Transaction marked as successful");
+                    }}
+                    className="px-4 py-2 text-white transition-colors bg-green-600 rounded-lg hover:bg-green-700"
                   >
-                    {updatingTransaction === transactionId ? (
-                      <>
-                        <span className="inline-block w-4 h-4 mr-2 border-2 border-white rounded-full border-t-transparent animate-spin"></span>
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <FiCheckCircle className="inline-block mr-2" />
-                        Approve Payment
-                      </>
-                    )}
+                    <FiCheckCircle className="inline-block mr-2" />
+                    Approve Payment
                   </button>
                 </div>
               )}
@@ -707,36 +839,6 @@ export default function TransactionDetailPage({ params }) {
           </div>
         </motion.div>
       </div>
-
-      {/* Upload modal */}
-      {showUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="w-full max-w-lg p-6 bg-white rounded-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                Upload Payment Proof
-              </h2>
-              <button
-                onClick={() => setShowUploadModal(false)}
-                className="p-2 text-gray-500 transition-colors rounded-full hover:bg-gray-100"
-              >
-                <FiXCircle size={20} />
-              </button>
-            </div>
-
-            <FileUploader onFileUploaded={handleFileUploaded} />
-          </div>
-        </div>
-      )}
-
-      {/* Image Viewer Modal */}
-      {showImageViewer && proofPaymentUrl && (
-        <ImageViewer
-          imageUrl={proofPaymentUrl}
-          onClose={() => setShowImageViewer(false)}
-          title="Payment Proof"
-        />
-      )}
     </div>
   );
 }
