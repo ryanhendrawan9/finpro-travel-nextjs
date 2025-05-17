@@ -1,17 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import {
-  FiFilter,
-  FiX,
-  FiSearch,
-  FiMapPin,
-  FiDollarSign,
-  FiStar,
-  FiChevronLeft,
-  FiChevronRight,
-} from "react-icons/fi";
+import { FiChevronRight, FiChevronLeft, FiSearch, FiX } from "react-icons/fi";
 import { activityService, categoryService } from "@/lib/api";
 import ActivityCard from "@/components/activity/activity-card";
 
@@ -20,14 +12,9 @@ export default function ActivitiesPage() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
 
-  // Filter states
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("all");
-  const [priceRange, setPriceRange] = useState([0, 5000000]);
-  const [minRating, setMinRating] = useState(0);
-  const [sortBy, setSortBy] = useState("popularity");
+  // Search state
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
@@ -37,6 +24,7 @@ export default function ActivitiesPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        setLoading(true);
         const [activitiesRes, categoriesRes] = await Promise.all([
           activityService.getAll(),
           categoryService.getAll(),
@@ -48,63 +36,31 @@ export default function ActivitiesPage() {
         console.error("Error fetching data:", err);
         setError("Failed to load activities. Please try again later.");
       } finally {
-        setLoading(false);
+        setTimeout(() => {
+          setLoading(false);
+        }, 300); // Small delay for smoother transitions
       }
     };
 
     fetchData();
   }, []);
 
-  // Filter and sort activities
-  const filteredActivities = activities
-    .filter((activity) => {
-      // Search query filter
-      if (
-        searchQuery &&
-        !activity.title.toLowerCase().includes(searchQuery.toLowerCase())
-      ) {
-        return false;
-      }
+  // Filtered activities using search term only
+  const filteredActivities = useMemo(() => {
+    if (!searchTerm) return activities;
 
-      // Category filter
-      if (
-        selectedCategory !== "all" &&
-        activity.categoryId !== selectedCategory
-      ) {
-        return false;
-      }
-
-      // Price range filter
-      const price = activity.price_discount || activity.price;
-      if (price < priceRange[0] || price > priceRange[1]) {
-        return false;
-      }
-
-      // Rating filter
-      if (activity.rating < minRating) {
-        return false;
-      }
-
-      return true;
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case "price-low":
-          return (a.price_discount || a.price) - (b.price_discount || b.price);
-        case "price-high":
-          return (b.price_discount || b.price) - (a.price_discount || a.price);
-        case "rating":
-          return b.rating - a.rating;
-        case "popularity":
-        default:
-          return b.total_reviews - a.total_reviews;
-      }
+    return activities.filter((activity) => {
+      return (
+        activity.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        activity.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
     });
+  }, [activities, searchTerm]);
 
-  // Reset to first page when filters change
+  // Reset to first page when search changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, selectedCategory, priceRange, minRating, sortBy]);
+  }, [searchTerm, itemsPerPage]);
 
   // Calculate pagination values
   const totalItems = filteredActivities.length;
@@ -116,20 +72,15 @@ export default function ActivitiesPage() {
     indexOfLastItem
   );
 
+  // Clear search
+  const clearSearch = () => {
+    setSearchTerm("");
+  };
+
   // Page change handlers
   const goToPage = (pageNumber) => {
     setCurrentPage(Math.max(1, Math.min(pageNumber, totalPages)));
     window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-      },
-    },
   };
 
   // Generate page buttons for pagination
@@ -152,13 +103,15 @@ export default function ActivitiesPage() {
     // First page button
     if (startPage > 1) {
       buttons.push(
-        <button
+        <motion.button
           key="first"
           onClick={() => goToPage(1)}
           className="px-3 py-1 text-sm font-medium text-gray-700 transition-colors rounded-md hover:bg-gray-100"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
         >
           1
-        </button>
+        </motion.button>
       );
 
       // Ellipsis if needed
@@ -174,7 +127,7 @@ export default function ActivitiesPage() {
     // Page buttons
     for (let i = startPage; i <= endPage; i++) {
       buttons.push(
-        <button
+        <motion.button
           key={i}
           onClick={() => goToPage(i)}
           className={`px-3 py-1 text-sm font-medium rounded-md ${
@@ -182,9 +135,16 @@ export default function ActivitiesPage() {
               ? "bg-primary-600 text-white"
               : "text-gray-700 hover:bg-gray-100"
           }`}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          animate={{
+            backgroundColor:
+              currentPage === i ? "rgb(79, 70, 229)" : "transparent",
+            color: currentPage === i ? "white" : "rgb(55, 65, 81)",
+          }}
         >
           {i}
-        </button>
+        </motion.button>
       );
     }
 
@@ -200,25 +160,111 @@ export default function ActivitiesPage() {
     // Last page button
     if (endPage < totalPages) {
       buttons.push(
-        <button
+        <motion.button
           key="last"
           onClick={() => goToPage(totalPages)}
           className="px-3 py-1 text-sm font-medium text-gray-700 transition-colors rounded-md hover:bg-gray-100"
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
         >
           {totalPages}
-        </button>
+        </motion.button>
       );
     }
 
     return buttons;
   };
 
+  // Enhanced animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+        delayChildren: 0.2,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 50 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        type: "spring",
+        stiffness: 100,
+        damping: 12,
+      },
+    },
+    hover: {
+      y: -10,
+      boxShadow:
+        "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+      transition: {
+        type: "spring",
+        stiffness: 400,
+        damping: 15,
+      },
+    },
+  };
+
+  const headerVariants = {
+    hidden: { opacity: 0, y: -20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        type: "spring",
+        stiffness: 100,
+        damping: 15,
+        delay: 0.1,
+      },
+    },
+  };
+
+  // Loading Animation
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-2xl font-bold animate-pulse text-primary-600">
-          Loading amazing activities...
-        </div>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{
+            opacity: 1,
+            scale: [1, 1.05, 1],
+            transition: {
+              scale: {
+                repeat: Infinity,
+                duration: 1.5,
+                repeatType: "reverse",
+              },
+            },
+          }}
+          className="flex flex-col items-center text-2xl font-bold text-primary-600"
+        >
+          <svg
+            className="w-10 h-10 mb-4 animate-spin"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+          Loading activities...
+        </motion.div>
       </div>
     );
   }
@@ -226,13 +272,24 @@ export default function ActivitiesPage() {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="mb-4 text-2xl font-bold text-red-600">{error}</div>
-        <button
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-4 text-2xl font-bold text-red-600"
+        >
+          {error}
+        </motion.div>
+        <motion.button
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
           onClick={() => window.location.reload()}
           className="px-6 py-2 text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
         >
           Try Again
-        </button>
+        </motion.button>
       </div>
     );
   }
@@ -240,469 +297,334 @@ export default function ActivitiesPage() {
   return (
     <div className="min-h-screen pt-24 pb-16 bg-gray-50">
       <div className="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-        <div className="flex flex-col justify-between mb-8 md:flex-row md:items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 font-heading">
-              Discover Activities
-            </h1>
-            <p className="mt-2 text-gray-600">
-              Explore {filteredActivities.length} amazing experiences and
-              adventures
-            </p>
-          </div>
+        {/* Header */}
+        <motion.div
+          className="mb-8 text-center"
+          variants={headerVariants}
+          initial="hidden"
+          animate="visible"
+        >
+          <motion.h1
+            className="mb-4 text-3xl font-bold text-gray-900 md:text-4xl font-heading"
+            animate={{ scale: [1, 1.02, 1] }}
+            transition={{
+              repeat: 0,
+              duration: 1.5,
+            }}
+          >
+            Discover Activities
+          </motion.h1>
+          <motion.p
+            className="max-w-3xl mx-auto text-gray-600"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            Explore {filteredActivities.length} amazing experiences and
+            adventures to make your trip unforgettable
+          </motion.p>
+        </motion.div>
 
-          <div className="flex items-center mt-4 md:mt-0">
-            <div className="relative mr-3">
-              <FiSearch className="absolute text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
+        {/* Search Bar */}
+        {activities.length > 0 && (
+          <motion.div
+            className="p-4 mb-6 bg-white shadow-sm rounded-xl"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <FiSearch className="text-gray-400" />
+              </div>
               <input
                 type="text"
-                placeholder="Search activities..."
-                className="py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full py-3 pl-10 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Search activities by name or description..."
               />
+              {searchTerm && (
+                <button
+                  onClick={clearSearch}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                >
+                  <FiX />
+                </button>
+              )}
             </div>
+          </motion.div>
+        )}
 
-            <button
-              className="flex items-center px-4 py-2 transition-colors rounded-lg bg-primary-100 text-primary-700 hover:bg-primary-200"
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
-            >
-              <FiFilter className="mr-2" />
-              Filter
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
-          {/* Filters - Desktop */}
-          <div className="sticky hidden p-6 bg-white shadow-sm lg:block rounded-xl h-fit top-28">
-            <h2 className="mb-4 text-lg font-bold text-gray-900">Filters</h2>
-
-            <div className="space-y-6">
-              {/* Category filter */}
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-gray-700">
-                  Category
-                </h3>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <input
-                      id="category-all"
-                      name="category"
-                      type="radio"
-                      checked={selectedCategory === "all"}
-                      onChange={() => setSelectedCategory("all")}
-                      className="w-4 h-4 border-gray-300 text-primary-600 focus:ring-primary-500"
-                    />
-                    <label
-                      htmlFor="category-all"
-                      className="ml-2 text-sm text-gray-700"
-                    >
-                      All Categories
-                    </label>
-                  </div>
-
-                  {categories.map((category) => (
-                    <div key={category.id} className="flex items-center">
-                      <input
-                        id={`category-${category.id}`}
-                        name="category"
-                        type="radio"
-                        checked={selectedCategory === category.id}
-                        onChange={() => setSelectedCategory(category.id)}
-                        className="w-4 h-4 border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                      <label
-                        htmlFor={`category-${category.id}`}
-                        className="ml-2 text-sm text-gray-700"
-                      >
-                        {category.name}
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Price range filter */}
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-gray-700">
-                  Price Range
-                </h3>
-                <div className="space-y-2">
-                  <input
-                    type="range"
-                    min="0"
-                    max="5000000"
-                    step="100000"
-                    value={priceRange[1]}
-                    onChange={(e) =>
-                      setPriceRange([0, parseInt(e.target.value)])
-                    }
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                  />
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">Rp 0</span>
-                    <span className="text-sm font-medium text-primary-600">
-                      Rp {priceRange[1].toLocaleString("id-ID")}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Rating filter */}
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-gray-700">
-                  Minimum Rating
-                </h3>
-                <div className="flex items-center space-x-2">
-                  {[0, 1, 2, 3, 4, 5].map((rating) => (
-                    <button
-                      key={rating}
-                      className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
-                        minRating === rating
-                          ? "bg-primary-600 text-white"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                      onClick={() => setMinRating(rating)}
-                    >
-                      {rating}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Sort by */}
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-gray-700">
-                  Sort By
-                </h3>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value="popularity">Popularity</option>
-                  <option value="rating">Rating</option>
-                  <option value="price-low">Price: Low to High</option>
-                  <option value="price-high">Price: High to Low</option>
-                </select>
-              </div>
-
-              {/* Items per page */}
-              <div>
-                <h3 className="mb-2 text-sm font-medium text-gray-700">
-                  Items Per Page
-                </h3>
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => {
-                    setItemsPerPage(Number(e.target.value));
-                    setCurrentPage(1); // Reset to first page when changing items per page
-                  }}
-                  className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                >
-                  <option value={6}>6</option>
-                  <option value={9}>9</option>
-                  <option value={12}>12</option>
-                  <option value={24}>24</option>
-                </select>
-              </div>
-
-              {/* Reset filters */}
-              <button
-                className="w-full px-4 py-2 text-gray-700 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50"
-                onClick={() => {
-                  setSearchQuery("");
-                  setSelectedCategory("all");
-                  setPriceRange([0, 5000000]);
-                  setMinRating(0);
-                  setSortBy("popularity");
+        {/* Items per page selector */}
+        {activities.length > 0 && (
+          <motion.div
+            className="flex justify-end mb-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <div className="flex items-center">
+              <label
+                htmlFor="items-per-page"
+                className="mr-2 text-sm text-gray-700"
+              >
+                Show:
+              </label>
+              <motion.select
+                id="items-per-page"
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
                   setCurrentPage(1);
                 }}
+                className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+                whileHover={{ scale: 1.02 }}
               >
-                Reset Filters
-              </button>
+                <option value={6}>6</option>
+                <option value={9}>9</option>
+                <option value={12}>12</option>
+                <option value={24}>24</option>
+              </motion.select>
             </div>
-          </div>
+          </motion.div>
+        )}
 
-          {/* Filters - Mobile */}
-          {isFilterOpen && (
-            <div className="fixed inset-0 z-50 flex justify-end bg-black bg-opacity-50 lg:hidden">
+        {/* Results count if searching */}
+        {searchTerm && (
+          <motion.div
+            className="mb-6 text-sm text-gray-500"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            Found {totalItems} {totalItems !== 1 ? "activities" : "activity"}{" "}
+            matching "{searchTerm}"
+          </motion.div>
+        )}
+
+        {totalItems > 0 ? (
+          <>
+            <motion.div
+              className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              {currentItems.map((activity, index) => (
+                <motion.div
+                  key={activity.id}
+                  variants={itemVariants}
+                  whileHover="hover"
+                  custom={index}
+                >
+                  <ActivityCard activity={activity} index={index} />
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
               <motion.div
-                initial={{ x: "100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "100%" }}
-                transition={{ duration: 0.3 }}
-                className="w-full h-full max-w-xs overflow-y-auto bg-white"
+                className="flex flex-col items-center justify-between mt-10 space-y-3 sm:flex-row sm:space-y-0"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
               >
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-lg font-bold text-gray-900">Filters</h2>
-                    <button
-                      className="text-gray-500 hover:text-gray-700"
-                      onClick={() => setIsFilterOpen(false)}
-                    >
-                      <FiX size={20} />
-                    </button>
-                  </div>
+                <div className="text-sm text-gray-700">
+                  Showing{" "}
+                  <span className="font-medium">{indexOfFirstItem + 1}</span> to{" "}
+                  <span className="font-medium">
+                    {Math.min(indexOfLastItem, totalItems)}
+                  </span>{" "}
+                  of <span className="font-medium">{totalItems}</span>{" "}
+                  activities
+                </div>
 
-                  <div className="space-y-6">
-                    {/* Mobile filters - same as desktop */}
-                    {/* Category filter */}
-                    <div>
-                      <h3 className="mb-2 text-sm font-medium text-gray-700">
-                        Category
-                      </h3>
-                      <div className="space-y-2">
-                        <div className="flex items-center">
-                          <input
-                            id="mobile-category-all"
-                            name="mobile-category"
-                            type="radio"
-                            checked={selectedCategory === "all"}
-                            onChange={() => setSelectedCategory("all")}
-                            className="w-4 h-4 border-gray-300 text-primary-600 focus:ring-primary-500"
-                          />
-                          <label
-                            htmlFor="mobile-category-all"
-                            className="ml-2 text-sm text-gray-700"
-                          >
-                            All Categories
-                          </label>
-                        </div>
+                <div className="flex items-center space-x-1">
+                  {/* Previous page button */}
+                  <motion.button
+                    onClick={() => goToPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className={`p-2 rounded-md ${
+                      currentPage === 1
+                        ? "text-gray-400 cursor-not-allowed"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                    aria-label="Previous page"
+                    whileHover={currentPage !== 1 ? { scale: 1.1 } : {}}
+                    whileTap={currentPage !== 1 ? { scale: 0.95 } : {}}
+                  >
+                    <FiChevronLeft className="w-5 h-5" />
+                  </motion.button>
 
-                        {categories.map((category) => (
-                          <div key={category.id} className="flex items-center">
-                            <input
-                              id={`mobile-category-${category.id}`}
-                              name="mobile-category"
-                              type="radio"
-                              checked={selectedCategory === category.id}
-                              onChange={() => setSelectedCategory(category.id)}
-                              className="w-4 h-4 border-gray-300 text-primary-600 focus:ring-primary-500"
-                            />
-                            <label
-                              htmlFor={`mobile-category-${category.id}`}
-                              className="ml-2 text-sm text-gray-700"
-                            >
-                              {category.name}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  {/* Page number buttons */}
+                  <div className="flex items-center">{getPageButtons()}</div>
 
-                    {/* Price range filter */}
-                    <div>
-                      <h3 className="mb-2 text-sm font-medium text-gray-700">
-                        Price Range
-                      </h3>
-                      <div className="space-y-2">
-                        <input
-                          type="range"
-                          min="0"
-                          max="5000000"
-                          step="100000"
-                          value={priceRange[1]}
-                          onChange={(e) =>
-                            setPriceRange([0, parseInt(e.target.value)])
-                          }
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                        />
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-gray-500">Rp 0</span>
-                          <span className="text-sm font-medium text-primary-600">
-                            Rp {priceRange[1].toLocaleString("id-ID")}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Rating filter */}
-                    <div>
-                      <h3 className="mb-2 text-sm font-medium text-gray-700">
-                        Minimum Rating
-                      </h3>
-                      <div className="flex items-center space-x-2">
-                        {[0, 1, 2, 3, 4, 5].map((rating) => (
-                          <button
-                            key={rating}
-                            className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
-                              minRating === rating
-                                ? "bg-primary-600 text-white"
-                                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                            }`}
-                            onClick={() => setMinRating(rating)}
-                          >
-                            {rating}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Sort by */}
-                    <div>
-                      <h3 className="mb-2 text-sm font-medium text-gray-700">
-                        Sort By
-                      </h3>
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <option value="popularity">Popularity</option>
-                        <option value="rating">Rating</option>
-                        <option value="price-low">Price: Low to High</option>
-                        <option value="price-high">Price: High to Low</option>
-                      </select>
-                    </div>
-
-                    {/* Items per page */}
-                    <div>
-                      <h3 className="mb-2 text-sm font-medium text-gray-700">
-                        Items Per Page
-                      </h3>
-                      <select
-                        value={itemsPerPage}
-                        onChange={(e) => {
-                          setItemsPerPage(Number(e.target.value));
-                          setCurrentPage(1);
-                        }}
-                        className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <option value={6}>6</option>
-                        <option value={9}>9</option>
-                        <option value={12}>12</option>
-                        <option value={24}>24</option>
-                      </select>
-                    </div>
-
-                    {/* Apply and Reset buttons */}
-                    <div className="flex flex-col pt-4 space-y-2 border-t border-gray-200">
-                      <button
-                        className="w-full px-4 py-2 text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
-                        onClick={() => setIsFilterOpen(false)}
-                      >
-                        Apply Filters
-                      </button>
-
-                      <button
-                        className="w-full px-4 py-2 text-gray-700 transition-colors border border-gray-300 rounded-lg hover:bg-gray-50"
-                        onClick={() => {
-                          setSearchQuery("");
-                          setSelectedCategory("all");
-                          setPriceRange([0, 5000000]);
-                          setMinRating(0);
-                          setSortBy("popularity");
-                          setCurrentPage(1);
-                        }}
-                      >
-                        Reset Filters
-                      </button>
-                    </div>
-                  </div>
+                  {/* Next page button */}
+                  <motion.button
+                    onClick={() => goToPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className={`p-2 rounded-md ${
+                      currentPage === totalPages
+                        ? "text-gray-400 cursor-not-allowed"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                    aria-label="Next page"
+                    whileHover={
+                      currentPage !== totalPages ? { scale: 1.1 } : {}
+                    }
+                    whileTap={currentPage !== totalPages ? { scale: 0.95 } : {}}
+                  >
+                    <FiChevronRight className="w-5 h-5" />
+                  </motion.button>
                 </div>
               </motion.div>
-            </div>
-          )}
-
-          {/* Activities grid */}
-          <div className="lg:col-span-3">
-            {filteredActivities.length > 0 ? (
-              <>
-                <motion.div
-                  className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
-                  variants={containerVariants}
-                  initial="hidden"
-                  animate="visible"
-                >
-                  {currentItems.map((activity, index) => (
-                    <ActivityCard
-                      key={activity.id}
-                      activity={activity}
-                      index={index}
-                    />
-                  ))}
-                </motion.div>
-
-                {/* Pagination controls */}
-                {totalPages > 1 && (
-                  <div className="flex flex-col items-center justify-between mt-8 space-y-3 sm:flex-row sm:space-y-0">
-                    <div className="text-sm text-gray-700">
-                      Showing{" "}
-                      <span className="font-medium">
-                        {indexOfFirstItem + 1}
-                      </span>{" "}
-                      to{" "}
-                      <span className="font-medium">
-                        {Math.min(indexOfLastItem, totalItems)}
-                      </span>{" "}
-                      of <span className="font-medium">{totalItems}</span>{" "}
-                      activities
-                    </div>
-
-                    <div className="flex items-center space-x-1">
-                      {/* Previous page button */}
-                      <button
-                        onClick={() => goToPage(currentPage - 1)}
-                        disabled={currentPage === 1}
-                        className={`p-2 rounded-md ${
-                          currentPage === 1
-                            ? "text-gray-400 cursor-not-allowed"
-                            : "text-gray-700 hover:bg-gray-100"
-                        }`}
-                      >
-                        <FiChevronLeft className="w-5 h-5" />
-                      </button>
-
-                      {/* Page number buttons */}
-                      <div className="flex items-center">
-                        {getPageButtons()}
-                      </div>
-
-                      {/* Next page button */}
-                      <button
-                        onClick={() => goToPage(currentPage + 1)}
-                        disabled={currentPage === totalPages}
-                        className={`p-2 rounded-md ${
-                          currentPage === totalPages
-                            ? "text-gray-400 cursor-not-allowed"
-                            : "text-gray-700 hover:bg-gray-100"
-                        }`}
-                      >
-                        <FiChevronRight className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="p-8 text-center bg-white shadow-sm rounded-xl">
-                <FiSearch className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="mb-2 text-xl font-bold text-gray-900">
-                  No activities found
-                </h3>
-                <p className="mb-6 text-gray-600">
-                  Try adjusting your filters or search query to find what you're
-                  looking for.
-                </p>
-                <button
-                  className="px-6 py-2 text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSelectedCategory("all");
-                    setPriceRange([0, 5000000]);
-                    setMinRating(0);
-                    setSortBy("popularity");
-                    setCurrentPage(1);
-                  }}
-                >
-                  Reset Filters
-                </button>
-              </div>
             )}
-          </div>
-        </div>
+          </>
+        ) : (
+          <motion.div
+            className="p-8 text-center bg-white shadow-sm rounded-xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 100,
+              damping: 15,
+            }}
+          >
+            <motion.div
+              className="w-16 h-16 mx-auto mb-4 text-gray-300"
+              animate={{
+                rotate: [0, 10, -10, 10, 0],
+                scale: [1, 1.1, 1],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                repeatDelay: 3,
+              }}
+            >
+              <FiSearch size={64} />
+            </motion.div>
+            <motion.h3
+              className="mb-2 text-xl font-bold text-gray-900"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+            >
+              {searchTerm
+                ? "No activities match your search"
+                : "No activities found"}
+            </motion.h3>
+            <motion.p
+              className="mb-6 text-gray-600"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              {searchTerm
+                ? "Try different keywords or clear your search."
+                : "There are currently no activities available. Check back later for new content!"}
+            </motion.p>
+            {searchTerm ? (
+              <motion.button
+                onClick={clearSearch}
+                className="inline-block px-6 py-2 text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Clear Search
+              </motion.button>
+            ) : (
+              <motion.button
+                onClick={() => window.location.reload()}
+                className="inline-block px-6 py-2 text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                Refresh Page
+              </motion.button>
+            )}
+          </motion.div>
+        )}
+
+        {/* Featured Categories Section */}
+        {categories.length > 0 && (
+          <motion.div
+            className="pt-8 mt-16 border-t border-gray-200"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <h2 className="mb-6 text-2xl font-bold text-center text-gray-900 font-heading">
+              Explore By Category
+            </h2>
+
+            <motion.div
+              className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              transition={{ staggerChildren: 0.1, delayChildren: 0.3 }}
+            >
+              {categories.slice(0, 3).map((category, index) => (
+                <motion.div
+                  key={category.id}
+                  variants={itemVariants}
+                  whileHover={{ y: -10, transition: { duration: 0.3 } }}
+                >
+                  <Link href={`/category/${category.id}`}>
+                    <div className="relative h-48 overflow-hidden transition-shadow duration-300 shadow-lg group rounded-2xl hover:shadow-xl">
+                      <img
+                        src={
+                          category.imageUrl ||
+                          "/images/placeholders/category-placeholder.jpg"
+                        }
+                        alt={category.name}
+                        className="object-cover w-full h-full transition-transform duration-700 group-hover:scale-110"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src =
+                            "/images/placeholders/category-placeholder.jpg";
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
+                      <div className="absolute bottom-0 left-0 right-0 p-6">
+                        <div className="flex items-center justify-between">
+                          <h3 className="mb-2 text-xl font-bold text-white">
+                            {category.name}
+                          </h3>
+                          <div className="flex items-center justify-center w-8 h-8 transition-transform rounded-full bg-white/20 group-hover:translate-x-2">
+                            <FiChevronRight className="text-white" size={18} />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {categories.length > 3 && (
+              <motion.div
+                className="flex justify-center mt-8"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 }}
+              >
+                <Link href="/category">
+                  <motion.div
+                    className="px-6 py-3 font-medium text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    View All Categories
+                  </motion.div>
+                </Link>
+              </motion.div>
+            )}
+          </motion.div>
+        )}
       </div>
     </div>
   );

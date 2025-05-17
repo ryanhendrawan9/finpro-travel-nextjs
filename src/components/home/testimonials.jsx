@@ -240,7 +240,7 @@ export default function Testimonials() {
           <div className="absolute z-20 -translate-y-1/2 top-1/2 -left-5 md:left-0">
             <motion.button
               onClick={prevTestimonial}
-              className="p-3 text-white transition-all border-2 border-purple-600 rounded-full shadow-lg bg-purple-600 hover:bg-purple-700 hover:border-purple-700"
+              className="p-3 text-white transition-all bg-purple-600 border-2 border-purple-600 rounded-full shadow-lg hover:bg-purple-700 hover:border-purple-700"
               whileHover={{ scale: 1.1, x: -5 }}
               whileTap={{ scale: 0.95 }}
               initial={{ opacity: 0, x: -20 }}
@@ -255,7 +255,7 @@ export default function Testimonials() {
           <div className="absolute z-20 -translate-y-1/2 top-1/2 -right-5 md:right-0">
             <motion.button
               onClick={nextTestimonial}
-              className="p-3 text-white transition-all border-2 border-purple-600 rounded-full shadow-lg bg-purple-600 hover:bg-purple-700 hover:border-purple-700"
+              className="p-3 text-white transition-all bg-purple-600 border-2 border-purple-600 rounded-full shadow-lg hover:bg-purple-700 hover:border-purple-700"
               whileHover={{ scale: 1.1, x: 5 }}
               whileTap={{ scale: 0.95 }}
               initial={{ opacity: 0, x: 20 }}
